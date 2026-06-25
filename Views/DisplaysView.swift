@@ -61,13 +61,18 @@ private struct DisplayRow: View {
 struct DisplayDetailView: View {
     @Bindable var store: DisplayStore
     var display: DisplayDevice
+    @State private var showTechnicalDetails = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 18) {
                 header
+                if store.pendingModeChange?.displayID == display.id {
+                    pendingStatusPanel
+                }
+                primaryStatusPanel
                 systemSettingsSnapshot
-                hidpiSettings
+                technicalDetailsDisclosure
             }
             .padding(.horizontal, 34)
             .padding(.vertical, 30)
@@ -89,6 +94,73 @@ struct DisplayDetailView: View {
         }
     }
 
+    private var primaryStatusPanel: some View {
+        HStack(alignment: .center, spacing: 18) {
+            Label(
+                display.isCurrentHiDPI ? L10n.t("hidpi.currentOn", store.language) : L10n.t("hidpi.currentOff", store.language),
+                systemImage: display.isCurrentHiDPI ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
+            )
+            .font(.headline)
+            .foregroundStyle(display.isCurrentHiDPI ? .green : .orange)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(display.currentMode?.resolutionLabel ?? L10n.t("display.modeUnavailable", store.language))
+                    .font(.title3.weight(.semibold))
+                Text(display.currentMode?.detailLabel ?? L10n.t("display.modeUnavailable", store.language))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let error = store.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .textSelection(.enabled)
+                }
+            }
+
+            Spacer()
+
+            if let bestMode = display.recommendedHiDPIModes.first {
+                Button {
+                    store.applyDisplayMode(bestMode, for: display.id)
+                } label: {
+                    Label(bestMode.resolutionLabel, systemImage: "sparkles")
+                }
+                .buttonStyle(.borderedProminent)
+            } else {
+                Text(L10n.t("hidpi.none", store.language))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 220, alignment: .trailing)
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var pendingStatusPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let pending = store.pendingModeChange, pending.displayID == display.id {
+                Text("\(L10n.t("hidpi.pending", store.language)) · \(pending.remainingSeconds)s")
+                    .font(.headline)
+                    .foregroundStyle(.orange)
+
+                HStack {
+                    Button(L10n.t("hidpi.confirm", store.language)) {
+                        store.confirmDisplayModeChange()
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button(L10n.t("hidpi.rollback", store.language), role: .cancel) {
+                        store.rollbackDisplayModeChange()
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+        .padding(16)
+        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+    }
+
     private var displaySubtitle: String {
         [
             "\(L10n.t("display.vendor", store.language)) \(display.metadata.vendorHex)",
@@ -97,32 +169,10 @@ struct DisplayDetailView: View {
         ].joined(separator: " · ")
     }
 
-    private var hidpiSettings: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(L10n.t("hidpi.title", store.language))
-                .font(.title2.weight(.semibold))
-
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 18) {
-                    diagnosticPanel
-                        .frame(width: 340, alignment: .topLeading)
-
-                    recommendationPanel
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-
-                VStack(alignment: .leading, spacing: 18) {
-                    diagnosticPanel
-                    recommendationPanel
-                }
-            }
-        }
-    }
-
     private var systemSettingsSnapshot: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(L10n.t("systemSettings.title", store.language))
+                Text(L10n.t("systemSettings.resolutions", store.language))
                     .font(.title2.weight(.semibold))
                 Spacer()
                 Button {
@@ -133,19 +183,7 @@ struct DisplayDetailView: View {
                 .buttonStyle(.bordered)
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 18) {
-                    systemSummaryGrid
-                        .frame(width: 340, alignment: .topLeading)
-                    systemResolutionList
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-
-                VStack(alignment: .leading, spacing: 18) {
-                    systemSummaryGrid
-                    systemResolutionList
-                }
-            }
+            systemResolutionList
         }
     }
 
@@ -190,9 +228,6 @@ struct DisplayDetailView: View {
 
     private var systemResolutionList: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(L10n.t("systemSettings.resolutions", store.language))
-                .font(.headline)
-
             ForEach(display.systemScaledModes) { mode in
                 systemResolutionRow(mode)
             }
@@ -224,6 +259,13 @@ struct DisplayDetailView: View {
             Text(mode.isHiDPI ? "HiDPI" : "1x")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if !isCurrent {
+                Button(L10n.t("hidpi.apply", store.language)) {
+                    store.applyDisplayMode(mode, for: display.id)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
@@ -236,182 +278,79 @@ struct DisplayDetailView: View {
         return "\(L10n.t("display.main", store.language)) · \(active)"
     }
 
-    private var diagnosticPanel: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(L10n.t("hidpi.diagnosis", store.language))
+    private var technicalDetailsDisclosure: some View {
+        DisclosureGroup(isExpanded: $showTechnicalDetails) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 18) {
+                    systemSummaryGrid
+                        .frame(width: 340, alignment: .topLeading)
+                    technicalDetailsGrid
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+
+                VStack(alignment: .leading, spacing: 18) {
+                    systemSummaryGrid
+                    technicalDetailsGrid
+                }
+            }
+            .padding(.top, 12)
+        } label: {
+            Text(L10n.t("display.technicalDetails", store.language))
                 .font(.headline)
-
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
-                GridRow {
-                    Text(L10n.t("display.product", store.language))
-                        .foregroundStyle(.secondary)
-                    Text(display.metadata.productName ?? display.shortName(language: store.language))
-                        .font(.body.weight(.medium))
-                }
-
-                GridRow {
-                    Text(L10n.t("display.class", store.language))
-                        .foregroundStyle(.secondary)
-                    Text(display.displayClass.label(language: store.language))
-                        .font(.body.weight(.medium))
-                }
-
-                GridRow {
-                    Text(L10n.t("display.native", store.language))
-                        .foregroundStyle(.secondary)
-                    Text(display.nativeMode?.label ?? L10n.t("display.modeUnavailable", store.language))
-                }
-
-                GridRow {
-                    Text(L10n.t("hidpi.current", store.language))
-                        .foregroundStyle(.secondary)
-                    Text(display.currentMode?.detailLabel ?? L10n.t("display.modeUnavailable", store.language))
-                }
-
-                GridRow {
-                    Text(L10n.t("display.physicalSize", store.language))
-                        .foregroundStyle(.secondary)
-                    Text("\(display.metadata.physicalSizeText) · \(display.metadata.diagonalText(language: store.language))")
-                }
-
-                GridRow {
-                    Text(L10n.t("display.estimatedPPI", store.language))
-                        .foregroundStyle(.secondary)
-                    Text(display.metadata.estimatedPPI(nativeMode: display.nativeMode))
-                }
-
-                GridRow {
-                    Text(L10n.t("display.modes", store.language))
-                        .foregroundStyle(.secondary)
-                    Text("\(display.availableModes.count) · HiDPI \(display.availableModes.filter(\.isHiDPI).count)")
-                }
-
-                GridRow {
-                    Text(L10n.t("display.identifiers", store.language))
-                        .foregroundStyle(.secondary)
-                    Text("\(display.metadata.vendorHex) / \(display.metadata.productHex) / \(display.metadata.serialText)")
-                        .textSelection(.enabled)
-                }
-
-                GridRow {
-                    Text(L10n.t("display.manufactured", store.language))
-                        .foregroundStyle(.secondary)
-                    Text(display.metadata.manufactureText)
-                }
-            }
-            .padding(12)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-
-            Label(
-                display.isCurrentHiDPI ? L10n.t("hidpi.currentOn", store.language) : L10n.t("hidpi.currentOff", store.language),
-                systemImage: display.isCurrentHiDPI ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
-            )
-            .foregroundStyle(display.isCurrentHiDPI ? .green : .orange)
-
-            Text(L10n.t("hidpi.note", store.language))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-            Button {
-                store.openSystemDisplaySettings()
-            } label: {
-                Label(L10n.t("hidpi.openSettings", store.language), systemImage: "gearshape")
-            }
-            .buttonStyle(.bordered)
         }
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 
-    private var recommendationPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            status
-            let hidpiModes = display.availableModes.filter(\.isHiDPI)
-            if hidpiModes.isEmpty {
-                ContentUnavailableView(L10n.t("hidpi.none", store.language), systemImage: "rectangle.badge.xmark")
-                    .frame(maxWidth: 520, alignment: .leading)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(L10n.t("hidpi.recommended", store.language))
-                        .font(.headline)
-
-                    if !display.recommendedHiDPIModes.isEmpty {
-                        modeList(display.recommendedHiDPIModes, markFirst: true)
-                    } else {
-                        Text(L10n.t("hidpi.noRecommendations", store.language))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text(L10n.t("hidpi.available", store.language))
-                        .font(.headline)
-                        .padding(.top, 8)
-                    modeList(hidpiModes, markFirst: false)
-                }
-            }
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func modeList(_ modes: [DisplayMode], markFirst: Bool) -> some View {
-        ForEach(Array(modes.enumerated()), id: \.element.id) { index, mode in
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack {
-                        Text(mode.label)
-                            .font(.body.weight(.medium))
-                        if markFirst && index == 0 {
-                            Text(L10n.t("hidpi.best", store.language))
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.tint.opacity(0.16), in: Capsule())
-                        }
-                    }
-                    Text(mode.detailLabel)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(L10n.t("hidpi.apply", store.language)) {
-                    store.applyDisplayMode(mode, for: display.id)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding(10)
-            .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    private var status: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let pending = store.pendingModeChange, pending.displayID == display.id {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("\(L10n.t("hidpi.pending", store.language)) · \(pending.remainingSeconds)s")
-                        .font(.headline)
-                    HStack {
-                        Button(L10n.t("hidpi.confirm", store.language)) {
-                            store.confirmDisplayModeChange()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        Button(L10n.t("hidpi.rollback", store.language), role: .cancel) {
-                            store.rollbackDisplayModeChange()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                .padding(12)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+    private var technicalDetailsGrid: some View {
+        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
+            GridRow {
+                Text(L10n.t("display.product", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.metadata.productName ?? display.shortName(language: store.language))
+                    .font(.body.weight(.medium))
             }
 
-            Text(store.statusMessage)
-                .foregroundStyle(.secondary)
-            if let error = store.lastError {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.orange)
+            GridRow {
+                Text(L10n.t("display.class", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.displayClass.label(language: store.language))
+                    .font(.body.weight(.medium))
+            }
+
+            GridRow {
+                Text(L10n.t("display.physicalSize", store.language))
+                    .foregroundStyle(.secondary)
+                Text("\(display.metadata.physicalSizeText) · \(display.metadata.diagonalText(language: store.language))")
+            }
+
+            GridRow {
+                Text(L10n.t("display.estimatedPPI", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.metadata.estimatedPPI(nativeMode: display.nativeMode))
+            }
+
+            GridRow {
+                Text(L10n.t("display.modes", store.language))
+                    .foregroundStyle(.secondary)
+                Text("\(display.availableModes.count) · HiDPI \(display.availableModes.filter(\.isHiDPI).count)")
+            }
+
+            GridRow {
+                Text(L10n.t("display.identifiers", store.language))
+                    .foregroundStyle(.secondary)
+                Text("\(display.metadata.vendorHex) / \(display.metadata.productHex) / \(display.metadata.serialText)")
                     .textSelection(.enabled)
             }
+
+            GridRow {
+                Text(L10n.t("display.manufactured", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.metadata.manufactureText)
+            }
         }
+        .padding(16)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
     }
+
 }

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct MenuBarControlView: View {
     @Bindable var store: DisplayStore
+    @Environment(\.openWindow) private var openWindow
+    @State private var showMoreModes = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(L10n.t("app.name", store.language))
                     .font(.headline)
@@ -18,23 +20,49 @@ struct MenuBarControlView: View {
             }
 
             ForEach(store.displays) { display in
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
                     Label(display.shortName(language: store.language), systemImage: display.isBuiltin ? "macbook" : "display")
                         .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
 
-                    Text(display.currentMode?.detailLabel ?? L10n.t("display.modeUnavailable", store.language))
+                    HStack {
+                        Text(display.currentMode?.resolutionLabel ?? L10n.t("display.modeUnavailable", store.language))
+                            .font(.title3.weight(.semibold))
+                        Spacer()
+                        Text(display.isCurrentHiDPI ? "HiDPI" : "1x")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(display.isCurrentHiDPI ? .green : .secondary)
+                    }
+
+                    Text(display.currentMode?.refreshRateLabel ?? "-")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    ForEach(display.recommendedHiDPIModes.prefix(3)) { mode in
+                    if let bestMode = display.recommendedHiDPIModes.first {
                         Button {
-                            store.applyDisplayMode(mode, for: display.id)
+                            store.applyDisplayMode(bestMode, for: display.id)
                         } label: {
                             HStack {
-                                Text(mode.label)
+                                Label(bestMode.resolutionLabel, systemImage: "sparkles")
                                 Spacer()
-                                Image(systemName: "checkmark.circle")
+                                Text(L10n.t("hidpi.best", store.language))
+                                    .foregroundStyle(.secondary)
                             }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+
+                    let extraModes = Array(display.recommendedHiDPIModes.dropFirst().prefix(3))
+                    if !extraModes.isEmpty {
+                        DisclosureGroup(isExpanded: $showMoreModes) {
+                            ForEach(extraModes) { mode in
+                                Button(mode.resolutionLabel) {
+                                    store.applyDisplayMode(mode, for: display.id)
+                                }
+                            }
+                        } label: {
+                            Text(L10n.t("menu.moreModes", store.language))
+                                .font(.caption)
                         }
                     }
                 }
@@ -46,6 +74,13 @@ struct MenuBarControlView: View {
             }
 
             Divider()
+
+            Button {
+                openWindow(id: "main")
+                NSApp.activate(ignoringOtherApps: true)
+            } label: {
+                Label(L10n.t("menu.openMain", store.language), systemImage: "macwindow")
+            }
 
             Button {
                 store.openSystemDisplaySettings()
@@ -71,9 +106,9 @@ struct MenuBarControlView: View {
             Text(store.statusMessage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
+                .lineLimit(1)
         }
-        .padding(14)
-        .frame(width: 380)
+        .padding(12)
+        .frame(width: 320)
     }
 }
