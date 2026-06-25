@@ -19,6 +19,7 @@ let package = Package(
                 "README.md",
                 "dist",
                 "script",
+                "Resources",
                 ".codex",
                 ".build"
             ],
