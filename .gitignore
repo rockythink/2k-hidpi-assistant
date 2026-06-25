@@ -1,0 +1,6 @@
+.build/
+dist/*
+!dist/.gitkeep
+.DS_Store
+*.xcuserdata/
+DerivedData/
