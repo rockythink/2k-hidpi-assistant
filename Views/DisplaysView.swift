@@ -5,21 +5,31 @@ struct DisplaysView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            List(selection: $store.selectedDisplayID) {
-                ForEach(store.displays) { display in
-                    DisplayRow(display: display, language: store.language)
-                        .tag(display.id)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(L10n.t("nav.displays", store.language))
+                    .font(.title3.weight(.semibold))
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 10)
+
+                List(selection: $store.selectedDisplayID) {
+                    ForEach(store.displays) { display in
+                        DisplayRow(display: display, language: store.language)
+                            .tag(display.id)
+                    }
                 }
+                .listStyle(.sidebar)
             }
-            .frame(minWidth: 240, idealWidth: 280)
-            .listStyle(.sidebar)
+            .frame(width: 300)
 
             Divider()
 
             if let display = store.selectedDisplay {
                 DisplayDetailView(store: store, display: display)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
                 ContentUnavailableView(L10n.t("empty.noDisplay", store.language), systemImage: "display.trianglebadge.exclamationmark")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .toolbar {
@@ -57,10 +67,10 @@ struct DisplayDetailView: View {
             VStack(alignment: .leading, spacing: 22) {
                 header
                 hidpiSettings
-                status
             }
-            .padding(28)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 34)
+            .padding(.vertical, 30)
+            .frame(maxWidth: 1100, alignment: .leading)
         }
         .navigationTitle(display.shortName(language: store.language))
     }
@@ -83,23 +93,20 @@ struct DisplayDetailView: View {
             Text(L10n.t("hidpi.title", store.language))
                 .font(.title2.weight(.semibold))
 
-            GeometryReader { proxy in
-                if proxy.size.width < 760 {
-                    VStack(alignment: .leading, spacing: 18) {
-                        diagnosticPanel
-                        recommendationPanel
-                    }
-                } else {
-                    HStack(alignment: .top, spacing: 18) {
-                        diagnosticPanel
-                            .frame(width: min(380, proxy.size.width * 0.38), alignment: .topLeading)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 18) {
+                    diagnosticPanel
+                        .frame(width: 340, alignment: .topLeading)
 
-                        recommendationPanel
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                    }
+                    recommendationPanel
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+
+                VStack(alignment: .leading, spacing: 18) {
+                    diagnosticPanel
+                    recommendationPanel
                 }
             }
-            .frame(minHeight: 520)
         }
     }
 
@@ -129,7 +136,7 @@ struct DisplayDetailView: View {
                 }
             }
             .padding(12)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
 
             Label(
                 display.isCurrentHiDPI ? L10n.t("hidpi.currentOn", store.language) : L10n.t("hidpi.currentOff", store.language),
@@ -149,7 +156,7 @@ struct DisplayDetailView: View {
             .buttonStyle(.bordered)
         }
         .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var recommendationPanel: some View {
@@ -179,7 +186,7 @@ struct DisplayDetailView: View {
             }
         }
         .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func modeList(_ modes: [DisplayMode], markFirst: Bool) -> some View {
@@ -208,7 +215,7 @@ struct DisplayDetailView: View {
                 .buttonStyle(.borderedProminent)
             }
             .padding(10)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
         }
     }
 
@@ -230,7 +237,7 @@ struct DisplayDetailView: View {
                     }
                 }
                 .padding(12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
             }
 
             Text(store.statusMessage)
