@@ -66,6 +66,7 @@ struct DisplayDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 header
+                systemSettingsSnapshot
                 hidpiSettings
             }
             .padding(.horizontal, 34)
@@ -116,6 +117,123 @@ struct DisplayDetailView: View {
                 }
             }
         }
+    }
+
+    private var systemSettingsSnapshot: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(L10n.t("systemSettings.title", store.language))
+                    .font(.title2.weight(.semibold))
+                Spacer()
+                Button {
+                    store.openSystemDisplaySettings()
+                } label: {
+                    Label(L10n.t("hidpi.openSettings", store.language), systemImage: "gearshape")
+                }
+                .buttonStyle(.bordered)
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 18) {
+                    systemSummaryGrid
+                        .frame(width: 340, alignment: .topLeading)
+                    systemResolutionList
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+
+                VStack(alignment: .leading, spacing: 18) {
+                    systemSummaryGrid
+                    systemResolutionList
+                }
+            }
+        }
+    }
+
+    private var systemSummaryGrid: some View {
+        Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
+            GridRow {
+                Text(L10n.t("display.defaultResolution", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.nativeMode?.resolutionLabel ?? L10n.t("display.modeUnavailable", store.language))
+                    .font(.body.weight(.medium))
+            }
+
+            GridRow {
+                Text(L10n.t("display.currentResolution", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.currentMode?.resolutionLabel ?? L10n.t("display.modeUnavailable", store.language))
+                    .font(.body.weight(.medium))
+            }
+
+            GridRow {
+                Text(L10n.t("display.refreshRate", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.currentMode?.refreshRateLabel ?? "-")
+            }
+
+            GridRow {
+                Text(L10n.t("display.colorProfile", store.language))
+                    .foregroundStyle(.secondary)
+                Text(display.metadata.colorSpaceText(language: store.language))
+                    .lineLimit(1)
+            }
+
+            GridRow {
+                Text(L10n.t("display.role", store.language))
+                    .foregroundStyle(.secondary)
+                Text(displayRoleText)
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var systemResolutionList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L10n.t("systemSettings.resolutions", store.language))
+                .font(.headline)
+
+            ForEach(display.systemScaledModes) { mode in
+                systemResolutionRow(mode)
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func systemResolutionRow(_ mode: DisplayMode) -> some View {
+        let isNative = display.nativeMode?.width == mode.width && display.nativeMode?.height == mode.height
+        let isCurrent = display.currentMode?.width == mode.width && display.currentMode?.height == mode.height
+
+        return HStack(spacing: 10) {
+            Text(mode.resolutionLabel)
+                .font(.body.weight(.medium))
+            if isNative {
+                Text(L10n.t("systemSettings.default", store.language))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            if isCurrent {
+                Text(L10n.t("systemSettings.current", store.language))
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.tint.opacity(0.16), in: Capsule())
+            }
+            Spacer()
+            Text(mode.isHiDPI ? "HiDPI" : "1x")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(.quaternary.opacity(isCurrent ? 0.7 : 0.3), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var displayRoleText: String {
+        let active = display.metadata.isActive ? L10n.t("display.active", store.language) : L10n.t("display.inactive", store.language)
+        guard display.metadata.isMain else { return active }
+        return "\(L10n.t("display.main", store.language)) · \(active)"
     }
 
     private var diagnosticPanel: some View {

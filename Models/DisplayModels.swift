@@ -36,6 +36,29 @@ struct DisplayDevice: Identifiable, Codable, Hashable {
         return DisplayClass(width: nativeMode.width, height: nativeMode.height)
     }
 
+    var systemScaledModes: [DisplayMode] {
+        var grouped = [String: DisplayMode]()
+        for mode in availableModes where mode.width >= 1024 && mode.height >= 576 {
+            let key = "\(mode.width)x\(mode.height)"
+            guard let existing = grouped[key] else {
+                grouped[key] = mode
+                continue
+            }
+
+            let currentScore = mode.systemSettingsScore(currentMode: currentMode)
+            let existingScore = existing.systemSettingsScore(currentMode: currentMode)
+            if currentScore > existingScore {
+                grouped[key] = mode
+            }
+        }
+
+        return grouped.values.sorted { lhs, rhs in
+            if lhs.width != rhs.width { return lhs.width > rhs.width }
+            if lhs.height != rhs.height { return lhs.height > rhs.height }
+            return lhs.refreshRate > rhs.refreshRate
+        }
+    }
+
     var isCurrentHiDPI: Bool {
         currentMode?.isHiDPI == true
     }
@@ -71,6 +94,9 @@ struct DisplayMetadata: Codable, Hashable {
     var physicalWidthMM: Double
     var physicalHeightMM: Double
     var unitNumber: UInt32
+    var colorSpaceName: String?
+    var isMain: Bool
+    var isActive: Bool
 
     var vendorHex: String {
         "0x" + String(vendorID, radix: 16, uppercase: true)
@@ -113,6 +139,11 @@ struct DisplayMetadata: Codable, Hashable {
         guard let nativeMode, let diagonalInches, diagonalInches > 0 else { return "-" }
         let pixelDiagonal = sqrt(Double(nativeMode.pixelWidth * nativeMode.pixelWidth + nativeMode.pixelHeight * nativeMode.pixelHeight))
         return "\(Int((pixelDiagonal / diagonalInches).rounded())) PPI"
+    }
+
+    func colorSpaceText(language: AppLanguage) -> String {
+        guard let colorSpaceName, !colorSpaceName.isEmpty else { return "-" }
+        return colorSpaceName
     }
 }
 
@@ -199,8 +230,29 @@ struct DisplayMode: Codable, Hashable, Identifiable {
         "\(label) · framebuffer \(pixelWidth) x \(pixelHeight)"
     }
 
+    var resolutionLabel: String {
+        "\(width) x \(height)"
+    }
+
+    var refreshRateLabel: String {
+        "\(Int(refreshRate.rounded()))Hz"
+    }
+
     var pixelArea: Int {
         pixelWidth * pixelHeight
+    }
+
+    func systemSettingsScore(currentMode: DisplayMode?) -> Int {
+        var score = 0
+        if currentMode?.width == width, currentMode?.height == height {
+            score += 100
+        }
+        if isHiDPI {
+            score += 20
+        }
+        score += Int(refreshRate.rounded())
+        score += min(pixelArea / 1_000_000, 20)
+        return score
     }
 }
 

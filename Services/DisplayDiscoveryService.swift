@@ -50,8 +50,18 @@ struct DisplayDiscoveryService {
             manufactureYear: readUInt32(info?[kDisplayYearOfManufacture as String]),
             physicalWidthMM: size.width,
             physicalHeightMM: size.height,
-            unitNumber: CGDisplayUnitNumber(id)
+            unitNumber: CGDisplayUnitNumber(id),
+            colorSpaceName: displayColorSpaceName(for: id),
+            isMain: CGDisplayIsMain(id) != 0,
+            isActive: CGDisplayIsActive(id) != 0
         )
+    }
+
+    private func displayColorSpaceName(for id: CGDirectDisplayID) -> String? {
+        guard let name = CGDisplayCopyColorSpace(id).name else {
+            return nil
+        }
+        return name as String
     }
 
     private func makeMode(_ mode: CGDisplayMode) -> DisplayMode {
