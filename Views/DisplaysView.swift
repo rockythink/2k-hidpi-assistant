@@ -79,9 +79,34 @@ struct DisplayDetailView: View {
     }
 
     private var hidpiSettings: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
             Text(L10n.t("hidpi.title", store.language))
                 .font(.title2.weight(.semibold))
+
+            GeometryReader { proxy in
+                if proxy.size.width < 760 {
+                    VStack(alignment: .leading, spacing: 18) {
+                        diagnosticPanel
+                        recommendationPanel
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 18) {
+                        diagnosticPanel
+                            .frame(width: min(380, proxy.size.width * 0.38), alignment: .topLeading)
+
+                        recommendationPanel
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                }
+            }
+            .frame(minHeight: 520)
+        }
+    }
+
+    private var diagnosticPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L10n.t("hidpi.diagnosis", store.language))
+                .font(.headline)
 
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
                 GridRow {
@@ -122,26 +147,39 @@ struct DisplayDetailView: View {
                 Label(L10n.t("hidpi.openSettings", store.language), systemImage: "gearshape")
             }
             .buttonStyle(.bordered)
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+    }
 
+    private var recommendationPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            status
             let hidpiModes = display.availableModes.filter(\.isHiDPI)
             if hidpiModes.isEmpty {
                 ContentUnavailableView(L10n.t("hidpi.none", store.language), systemImage: "rectangle.badge.xmark")
                     .frame(maxWidth: 520, alignment: .leading)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
+                    Text(L10n.t("hidpi.recommended", store.language))
+                        .font(.headline)
+
                     if !display.recommendedHiDPIModes.isEmpty {
-                        Text(L10n.t("hidpi.recommended", store.language))
-                            .font(.headline)
                         modeList(display.recommendedHiDPIModes, markFirst: true)
+                    } else {
+                        Text(L10n.t("hidpi.noRecommendations", store.language))
+                            .foregroundStyle(.secondary)
                     }
 
                     Text(L10n.t("hidpi.available", store.language))
                         .font(.headline)
+                        .padding(.top, 8)
                     modeList(hidpiModes, markFirst: false)
                 }
-                .frame(maxWidth: 620, alignment: .leading)
             }
         }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func modeList(_ modes: [DisplayMode], markFirst: Bool) -> some View {
