@@ -80,12 +80,20 @@ struct DisplayDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(display.shortName(language: store.language))
                     .font(.largeTitle.weight(.semibold))
-                Text("\(L10n.t("display.vendor", store.language)) \(display.vendorID) · \(L10n.t("display.model", store.language)) \(display.modelID) · \(L10n.t("display.serial", store.language)) \(display.serialNumber)")
+                Text(displaySubtitle)
                     .foregroundStyle(.secondary)
                 Text(display.currentMode?.label ?? L10n.t("display.modeUnavailable", store.language))
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var displaySubtitle: String {
+        [
+            "\(L10n.t("display.vendor", store.language)) \(display.metadata.vendorHex)",
+            "\(L10n.t("display.model", store.language)) \(display.metadata.productHex)",
+            "\(L10n.t("display.serial", store.language)) \(display.metadata.serialText)"
+        ].joined(separator: " · ")
     }
 
     private var hidpiSettings: some View {
@@ -117,6 +125,13 @@ struct DisplayDetailView: View {
 
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
                 GridRow {
+                    Text(L10n.t("display.product", store.language))
+                        .foregroundStyle(.secondary)
+                    Text(display.metadata.productName ?? display.shortName(language: store.language))
+                        .font(.body.weight(.medium))
+                }
+
+                GridRow {
                     Text(L10n.t("display.class", store.language))
                         .foregroundStyle(.secondary)
                     Text(display.displayClass.label(language: store.language))
@@ -133,6 +148,37 @@ struct DisplayDetailView: View {
                     Text(L10n.t("hidpi.current", store.language))
                         .foregroundStyle(.secondary)
                     Text(display.currentMode?.detailLabel ?? L10n.t("display.modeUnavailable", store.language))
+                }
+
+                GridRow {
+                    Text(L10n.t("display.physicalSize", store.language))
+                        .foregroundStyle(.secondary)
+                    Text("\(display.metadata.physicalSizeText) · \(display.metadata.diagonalText(language: store.language))")
+                }
+
+                GridRow {
+                    Text(L10n.t("display.estimatedPPI", store.language))
+                        .foregroundStyle(.secondary)
+                    Text(display.metadata.estimatedPPI(nativeMode: display.nativeMode))
+                }
+
+                GridRow {
+                    Text(L10n.t("display.modes", store.language))
+                        .foregroundStyle(.secondary)
+                    Text("\(display.availableModes.count) · HiDPI \(display.availableModes.filter(\.isHiDPI).count)")
+                }
+
+                GridRow {
+                    Text(L10n.t("display.identifiers", store.language))
+                        .foregroundStyle(.secondary)
+                    Text("\(display.metadata.vendorHex) / \(display.metadata.productHex) / \(display.metadata.serialText)")
+                        .textSelection(.enabled)
+                }
+
+                GridRow {
+                    Text(L10n.t("display.manufactured", store.language))
+                        .foregroundStyle(.secondary)
+                    Text(display.metadata.manufactureText)
                 }
             }
             .padding(12)

@@ -16,15 +16,19 @@ struct DisplayDiscoveryService {
             let mode = CGDisplayCopyDisplayMode(id).map(makeMode)
             let modes = availableModes(for: id)
             let frame = CGDisplayBounds(id)
+            let info = displayInfoDictionary(for: id)
+            let metadata = makeMetadata(for: id, info: info)
             return DisplayDevice(
                 id: id,
                 name: displayName(
                     for: id,
+                    info: info,
                     fallback: isBuiltin ? L10n.t("display.builtin", language) : L10n.t("display.external", language)
                 ),
                 vendorID: CGDisplayVendorNumber(id),
                 modelID: CGDisplayModelNumber(id),
                 serialNumber: CGDisplaySerialNumber(id),
+                metadata: metadata,
                 isBuiltin: isBuiltin,
                 isOnline: CGDisplayIsOnline(id) != 0,
                 frame: CGRectCodable(frame),
@@ -33,6 +37,21 @@ struct DisplayDiscoveryService {
                 rotation: CGDisplayRotation(id)
             )
         }
+    }
+
+    private func makeMetadata(for id: CGDirectDisplayID, info: [String: Any]?) -> DisplayMetadata {
+        let size = CGDisplayScreenSize(id)
+        return DisplayMetadata(
+            productName: productName(from: info),
+            vendorID: CGDisplayVendorNumber(id),
+            productID: CGDisplayModelNumber(id),
+            serialNumber: CGDisplaySerialNumber(id),
+            manufactureWeek: readUInt32(info?[kDisplayWeekOfManufacture as String]),
+            manufactureYear: readUInt32(info?[kDisplayYearOfManufacture as String]),
+            physicalWidthMM: size.width,
+            physicalHeightMM: size.height,
+            unitNumber: CGDisplayUnitNumber(id)
+        )
     }
 
     private func makeMode(_ mode: CGDisplayMode) -> DisplayMode {
@@ -73,12 +92,31 @@ struct DisplayDiscoveryService {
             }
     }
 
-    private func displayName(for id: CGDirectDisplayID, fallback: String) -> String {
-        guard let info = displayInfoDictionary(for: id),
-              let productNames = info[kDisplayProductName as String] as? [String: String] else {
+    private func displayName(for id: CGDirectDisplayID, info: [String: Any]?, fallback: String) -> String {
+        guard let name = productName(from: info) else {
             return fallback
         }
-        return productNames.values.first ?? fallback
+        return name
+    }
+
+    private func productName(from info: [String: Any]?) -> String? {
+        guard let productNames = info?[kDisplayProductName as String] as? [String: String] else {
+            return nil
+        }
+        return productNames.values.first
+    }
+
+    private func readUInt32(_ value: Any?) -> UInt32? {
+        switch value {
+        case let number as UInt32:
+            number
+        case let number as Int:
+            UInt32(number)
+        case let number as NSNumber:
+            number.uint32Value
+        default:
+            nil
+        }
     }
 
     private func displayInfoDictionary(for id: CGDirectDisplayID) -> [String: Any]? {
@@ -96,7 +134,7 @@ struct DisplayDiscoveryService {
                 service = IOIteratorNext(iterator)
             }
 
-            guard let info = IODisplayCreateInfoDictionary(service, UInt32(kIODisplayOnlyPreferredName)).takeRetainedValue() as? [String: Any] else {
+            guard let info = IODisplayCreateInfoDictionary(service, 0).takeRetainedValue() as? [String: Any] else {
                 continue
             }
 

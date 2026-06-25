@@ -7,6 +7,7 @@ struct DisplayDevice: Identifiable, Codable, Hashable {
     var vendorID: UInt32
     var modelID: UInt32
     var serialNumber: UInt32
+    var metadata: DisplayMetadata
     var isBuiltin: Bool
     var isOnline: Bool
     var frame: CGRectCodable
@@ -57,6 +58,61 @@ struct DisplayDevice: Identifiable, Codable, Hashable {
             }
             .prefix(5)
             .map { $0 }
+    }
+}
+
+struct DisplayMetadata: Codable, Hashable {
+    var productName: String?
+    var vendorID: UInt32
+    var productID: UInt32
+    var serialNumber: UInt32
+    var manufactureWeek: UInt32?
+    var manufactureYear: UInt32?
+    var physicalWidthMM: Double
+    var physicalHeightMM: Double
+    var unitNumber: UInt32
+
+    var vendorHex: String {
+        "0x" + String(vendorID, radix: 16, uppercase: true)
+    }
+
+    var productHex: String {
+        "0x" + String(productID, radix: 16, uppercase: true)
+    }
+
+    var serialText: String {
+        serialNumber == 0 ? "-" : "\(serialNumber)"
+    }
+
+    var manufactureText: String {
+        guard let manufactureYear else { return "-" }
+        if let manufactureWeek, manufactureWeek > 0 {
+            return "\(manufactureYear) W\(manufactureWeek)"
+        }
+        return "\(manufactureYear)"
+    }
+
+    var physicalSizeText: String {
+        guard physicalWidthMM > 0, physicalHeightMM > 0 else { return "-" }
+        return "\(Int(physicalWidthMM.rounded())) x \(Int(physicalHeightMM.rounded())) mm"
+    }
+
+    var diagonalInches: Double? {
+        guard physicalWidthMM > 0, physicalHeightMM > 0 else { return nil }
+        let diagonalMM = sqrt(physicalWidthMM * physicalWidthMM + physicalHeightMM * physicalHeightMM)
+        return diagonalMM / 25.4
+    }
+
+    func diagonalText(language: AppLanguage) -> String {
+        guard let diagonalInches else { return "-" }
+        let suffix = language.resolvedCode == "zh" ? "英寸" : "in"
+        return String(format: "%.1f %@", diagonalInches, suffix)
+    }
+
+    func estimatedPPI(nativeMode: DisplayMode?) -> String {
+        guard let nativeMode, let diagonalInches, diagonalInches > 0 else { return "-" }
+        let pixelDiagonal = sqrt(Double(nativeMode.pixelWidth * nativeMode.pixelWidth + nativeMode.pixelHeight * nativeMode.pixelHeight))
+        return "\(Int((pixelDiagonal / diagonalInches).rounded())) PPI"
     }
 }
 
