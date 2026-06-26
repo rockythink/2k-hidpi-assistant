@@ -57,6 +57,8 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$MIN_SYSTEM_VERSION</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.utilities</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>2K HiDPI Assistant uses Apple Events to toggle system Dark Mode and media settings.</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>NSSupportsAutomaticTermination</key>
@@ -66,6 +68,13 @@ cat >"$INFO_PLIST" <<PLIST
 </dict>
 </plist>
 PLIST
+
+SIGN_IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | awk -F\" '/"/ { print $2; exit }')"
+if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+  codesign --force --deep --sign "$SIGN_IDENTITY" --identifier "$BUNDLE_ID" "$APP_BUNDLE"
+else
+  codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_BUNDLE"
+fi
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"

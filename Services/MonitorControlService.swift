@@ -3,6 +3,11 @@ import Foundation
 
 struct MonitorControlService {
     func applyResolution(_ mode: DisplayMode, rotation: Double, for display: DisplayDevice, persist: Bool) throws {
+        if let cgsModeNumber = mode.cgsModeNumber {
+            try CGSDisplayModeAPI.applyModeNumber(cgsModeNumber, to: display.id, persist: persist)
+            return
+        }
+
         guard let cgMode = findCGMode(mode, for: display.id) else {
             throw MonitorControlError.unsupported(L10n.t("error.modeUnavailable", .system))
         }

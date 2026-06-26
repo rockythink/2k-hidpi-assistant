@@ -13,8 +13,8 @@ struct DisplayDiscoveryService {
 
         return ids.map { id in
             let isBuiltin = CGDisplayIsBuiltin(id) != 0
-            let mode = CGDisplayCopyDisplayMode(id).map(makeMode)
             let modes = availableModes(for: id)
+            let mode = currentMode(for: id, availableModes: modes) ?? CGDisplayCopyDisplayMode(id).map { makeMode($0, source: .coreGraphicsCurrent) }
             let frame = CGDisplayBounds(id)
             let info = displayInfoDictionary(for: id)
             let metadata = makeMetadata(for: id, info: info)
@@ -64,19 +64,43 @@ struct DisplayDiscoveryService {
         return name as String
     }
 
-    private func makeMode(_ mode: CGDisplayMode) -> DisplayMode {
+    private func makeMode(_ mode: CGDisplayMode, source: DisplayModeSource = .coreGraphics) -> DisplayMode {
         DisplayMode(
             modeID: mode.ioDisplayModeID,
+            cgsModeNumber: nil,
             width: mode.width,
             height: mode.height,
             pixelWidth: mode.pixelWidth,
             pixelHeight: mode.pixelHeight,
             refreshRate: mode.refreshRate == 0 ? 60 : mode.refreshRate,
-            isHiDPI: mode.pixelWidth > mode.width || mode.pixelHeight > mode.height
+            isHiDPI: mode.pixelWidth > mode.width || mode.pixelHeight > mode.height,
+            scaleDensity: mode.pixelWidth > mode.width || mode.pixelHeight > mode.height ? 2 : 1,
+            source: source
+        )
+    }
+
+    private func makeMode(_ mode: CGSDisplayModeDescription) -> DisplayMode {
+        let density = mode.density > 0 ? Double(mode.density) : 1
+        return DisplayMode(
+            modeID: Int32(mode.modeNumber),
+            cgsModeNumber: Int32(mode.modeNumber),
+            width: Int(mode.width),
+            height: Int(mode.height),
+            pixelWidth: Int((Double(mode.width) * density).rounded()),
+            pixelHeight: Int((Double(mode.height) * density).rounded()),
+            refreshRate: mode.refreshRate == 0 ? 60 : Double(mode.refreshRate),
+            isHiDPI: density > 1.5,
+            scaleDensity: density,
+            source: .privateCGS
         )
     }
 
     private func availableModes(for id: CGDirectDisplayID) -> [DisplayMode] {
+        let privateModes = privateDisplayModes(for: id)
+        if !privateModes.isEmpty {
+            return privateModes
+        }
+
         let options = [
             kCGDisplayShowDuplicateLowResolutionModes as String: true
         ] as CFDictionary
@@ -85,7 +109,7 @@ struct DisplayDiscoveryService {
             return []
         }
 
-        let modes = rawModes.map(makeMode)
+        let modes = rawModes.map { makeMode($0) }
         var seen = Set<String>()
         return modes
             .filter { mode in
@@ -99,6 +123,37 @@ struct DisplayDiscoveryService {
                 if lhs.width != rhs.width { return lhs.width > rhs.width }
                 if lhs.height != rhs.height { return lhs.height > rhs.height }
                 return lhs.refreshRate > rhs.refreshRate
+            }
+    }
+
+    private func currentMode(for id: CGDirectDisplayID, availableModes: [DisplayMode]) -> DisplayMode? {
+        guard let currentModeNumber = CGSDisplayModeAPI.currentModeNumber(for: id) else {
+            return nil
+        }
+        return availableModes.first { $0.cgsModeNumber == currentModeNumber }
+    }
+
+    private func privateDisplayModes(for id: CGDirectDisplayID) -> [DisplayMode] {
+        guard let descriptions = CGSDisplayModeAPI.displayModes(for: id), !descriptions.isEmpty else {
+            return []
+        }
+
+        let modes = descriptions.map(makeMode)
+        var seen = Set<String>()
+        return modes
+            .filter { mode in
+                guard mode.width >= 400, mode.height >= 300 else { return false }
+                let key = "\(mode.cgsModeNumber ?? mode.modeID)-\(mode.width)-\(mode.height)-\(mode.pixelWidth)-\(mode.pixelHeight)-\(Int(mode.refreshRate.rounded()))-\(mode.isHiDPI)"
+                guard !seen.contains(key) else { return false }
+                seen.insert(key)
+                return true
+            }
+            .sorted { lhs, rhs in
+                if lhs.isHiDPI != rhs.isHiDPI { return lhs.isHiDPI && !rhs.isHiDPI }
+                if lhs.width != rhs.width { return lhs.width > rhs.width }
+                if lhs.height != rhs.height { return lhs.height > rhs.height }
+                if lhs.refreshRate != rhs.refreshRate { return lhs.refreshRate > rhs.refreshRate }
+                return lhs.scaleDensity > rhs.scaleDensity
             }
     }
 

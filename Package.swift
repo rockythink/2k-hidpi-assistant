@@ -17,6 +17,7 @@ let package = Package(
             exclude: [
                 "Tests",
                 "README.md",
+                "docs",
                 "dist",
                 "script",
                 "Resources",
@@ -34,6 +35,11 @@ let package = Package(
             swiftSettings: [
                 .enableUpcomingFeature("BareSlashRegexLiterals")
             ]
+        ),
+        .testTarget(
+            name: "HiDPIBuddyTests",
+            dependencies: ["HiDPIBuddy"],
+            path: "Tests"
         )
     ]
 )
