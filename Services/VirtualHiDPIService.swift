@@ -173,7 +173,7 @@ final class VirtualHiDPIService {
     }
 
     private func locateHelper() throws -> URL {
-        let name = "HiDPIBuddyVirtualDisplayHelper"
+        let name = "PixelFitVirtualDisplayHelper"
         var candidates: [URL] = []
         if let executable = Bundle.main.executableURL {
             candidates.append(executable.deletingLastPathComponent().appendingPathComponent(name))

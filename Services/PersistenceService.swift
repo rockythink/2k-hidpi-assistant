@@ -37,7 +37,7 @@ struct PersistenceService {
             let data = try JSONEncoder.pretty.encode(snapshot)
             try data.write(to: fileURL, options: [.atomic])
         } catch {
-            NSLog("Failed to save HiDPIBuddy state: \(error.localizedDescription)")
+            NSLog("Failed to save PixelFit state: \(error.localizedDescription)")
         }
     }
 }

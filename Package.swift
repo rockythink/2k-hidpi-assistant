@@ -3,17 +3,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "HiDPIBuddy",
+    name: "PixelFit",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "HiDPIBuddy", targets: ["HiDPIBuddy"]),
-        .executable(name: "HiDPIBuddyVirtualDisplayHelper", targets: ["HiDPIBuddyVirtualDisplayHelper"])
+        .executable(name: "PixelFit", targets: ["PixelFit"]),
+        .executable(name: "PixelFitVirtualDisplayHelper", targets: ["PixelFitVirtualDisplayHelper"])
     ],
     targets: [
         .executableTarget(
-            name: "HiDPIBuddy",
+            name: "PixelFit",
             path: ".",
             exclude: [
                 "Tests",
@@ -40,14 +40,14 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "HiDPIBuddyVirtualDisplayHelper",
+            name: "PixelFitVirtualDisplayHelper",
             path: "NativeVirtualDisplay",
             cSettings: [.unsafeFlags(["-fobjc-arc"])],
             linkerSettings: [.linkedFramework("Foundation"), .linkedFramework("CoreGraphics")]
         ),
         .testTarget(
-            name: "HiDPIBuddyTests",
-            dependencies: ["HiDPIBuddy"],
+            name: "PixelFitTests",
+            dependencies: ["PixelFit"],
             path: "Tests"
         )
     ]

@@ -19,10 +19,10 @@ enum CLIService {
     private static func run(command: String, arguments: [String]) throws {
         if ["help", "--help", "-h"].contains(command) {
             print("""
-            hidpibuddy list
-            hidpibuddy status
-            hidpibuddy get [--index N] [--json]
-            hidpibuddy diagnose [--index N|--all] [--json]
+            PixelFit list
+            PixelFit status
+            PixelFit get [--index N] [--json]
+            PixelFit diagnose [--index N|--all] [--json]
             Resolution diagnostics only. Use the app for protected mode changes and physical HiDPI configuration.
             """)
             return

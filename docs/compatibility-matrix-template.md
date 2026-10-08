@@ -1,4 +1,4 @@
-# HiDPIBuddy Compatibility Matrix Template
+# PixelFit Compatibility Matrix Template
 
 Record actual resolution behavior, one row per physical display and connection
 path. Use `not tested` for unexercised behavior and `unknown` for missing
@@ -10,7 +10,7 @@ hardware information.
 
 ## Required Evidence
 
-- `swift run HiDPIBuddy diagnose --all --json` before, during and after switching.
+- `swift run PixelFit diagnose --all --json` before, during and after switching.
 - Actual App UI observations; do not treat an advertised mode as proof of a
   successful switch.
 - For virtual sessions: exact logical and pixel dimensions, actual refresh

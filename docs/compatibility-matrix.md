@@ -1,4 +1,4 @@
-# HiDPIBuddy Compatibility Matrix
+# PixelFit Compatibility Matrix
 
 Only resolution-related behavior is in scope. Connection paths not observed
 in the current session are marked unknown rather than inferred.
@@ -13,7 +13,7 @@ in the current session are marked unknown rather than inferred.
 ## Evidence
 
 Current observations were collected through the App's native accessibility
-surface / screenshots and `HiDPIBuddy diagnose --all --json`. Session-local
+surface / screenshots and `PixelFit diagnose --all --json`. Session-local
 diagnostic records and screenshots are not committed fixtures or downloadable
 evidence.
 
@@ -25,6 +25,29 @@ Physical output at 1600×1000 was user-verified, then kept. The App bundle was
 built and launched, and its actual main window was captured. Complete
 confirmation-sheet interaction remains unexercised. Framebuffers are render
 dimensions, not extra physical panel pixels.
+
+The PixelFit rebrand passed all 36 tests, packaged App launch, CLI help and the
+renamed helper's non-mutating runtime check. Native main-window and About-panel
+observations confirmed the PixelFit title, application menu and new geometric
+icon. Sculptor remained at 1600×1000 HiDPI / 120Hz with a 3200×2000 framebuffer,
+no mirror, and the existing installed configuration still registered/restorable.
+The VX main window continued to show 1920×1080 HiDPI / 60Hz. The bundle identity
+and original state/receipt paths are intentionally unchanged; no display mode
+or privileged configuration was written during branding verification.
+
+PixelFit 0.2.0 also exercised duplicate GUI startup: a second direct invocation
+returned successfully while the existing GUI PID remained unchanged, and the
+legacy HiDPIBuddy process was absent. Diagnostic CLI continued to work while
+the GUI was running. The signed arm64 release used Developer ID Application,
+hardened runtime and secure timestamps for both the App and helper; its actual
+main window was captured. This check did not change the Sculptor mode or its
+installed/restorable physical configuration.
+
+Apple notarization accepted the final PixelFit 0.2.0 arm64 App under submission
+`a2f5efd0-5c73-492e-bce4-d8066f8cee0a`. Stapling and ticket validation passed;
+strict signature verification passed; Gatekeeper reported `accepted` with
+source `Notarized Developer ID`. The distributable ZIP was recreated after
+stapling, with a separate SHA-256 checksum file.
 
 ## Not Verified
 

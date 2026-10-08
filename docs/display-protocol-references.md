@@ -1,6 +1,6 @@
 # Display Resolution API References
 
-HiDPIBuddy manages resolution only. Hardware controls, DDC probing, shading,
+PixelFit manages resolution only. Hardware controls, DDC probing, shading,
 Night Shift, keyboard interception, display synchronization and scheduling are
 not part of the application.
 
@@ -23,7 +23,7 @@ not part of the application.
 - BetterDisplay: https://github.com/waydabber/BetterDisplay
   - Product reference for native flexible scaling first and virtual mirroring as an optional fallback. Its application implementation is not provided by this documentation repository.
 - Resolute: https://github.com/omar-hanafy/Resolute/tree/77a16d3f5340ef18cdc2456468b86850923d2729
-  - MIT-licensed format reference for physical display scale-resolutions entries. HiDPIBuddy implements generation and the privileged transaction independently; no downloaded script is executed.
+  - MIT-licensed format reference for physical display scale-resolutions entries. PixelFit implements generation and the privileged transaction independently; no downloaded script is executed.
 - vdisplay: https://github.com/pacifistazero/vdisplay/tree/0ce57c9c053cd918836098be8087d72b4775214f
   - Private virtual-display ABI reference; not a bundled dependency.
 - Crisp: https://github.com/didriksg/Crisp/tree/a268173fa44b0b6d84fc9dafb20758097b60d07b

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import HiDPIBuddy
+@testable import PixelFit
 
 @Suite("Model compatibility")
 struct ModelCompatibilityTests {

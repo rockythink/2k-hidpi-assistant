@@ -202,7 +202,7 @@ int main(int argc, const char *argv[]) {
     @autoreleasepool {
         signal(SIGPIPE, SIG_IGN);
         if (argc == 2 && strcmp(argv[1], "--help") == 0) {
-            puts("HiDPIBuddyVirtualDisplayHelper DISPLAY_ID LOGICAL_WIDTH LOGICAL_HEIGHT REFRESH_HZ\nPrivate CGVirtualDisplay helper. JSON lines on stdout; stdin EOF stops and restores the targeted display.\n--version performs only runtime ABI checks; no display is created.");
+            puts("PixelFitVirtualDisplayHelper DISPLAY_ID LOGICAL_WIDTH LOGICAL_HEIGHT REFRESH_HZ\nPrivate CGVirtualDisplay helper. JSON lines on stdout; stdin EOF stops and restores the targeted display.\n--version performs only runtime ABI checks; no display is created.");
             return 0;
         }
         // Restore is isolated in a disposable process because a display
@@ -270,7 +270,7 @@ int main(int argc, const char *argv[]) {
             CGVirtualDisplayDescriptor *descriptor = [[NSClassFromString(@"CGVirtualDisplayDescriptor") alloc] init];
             if ([descriptor respondsToSelector:@selector(setQueue:)]) [descriptor setQueue:dispatch_get_main_queue()];
             else [descriptor setDispatchQueue:dispatch_get_main_queue()];
-            descriptor.name = @"HiDPIBuddy Virtual HiDPI";
+            descriptor.name = @"PixelFit Virtual HiDPI";
             descriptor.maxPixelsWide = logicalWidth * 2;
             descriptor.maxPixelsHigh = logicalHeight * 2;
             CGSize size = CGDisplayScreenSize(physicalID);

@@ -2,13 +2,30 @@ import SwiftUI
 import AppKit
 
 @main
-struct HiDPIBuddyApp: App {
+struct PixelFitApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store: DisplayStore
 
     init() {
         CLIService.runIfNeeded()
+        Self.activateExistingInstanceIfNeeded()
         _store = State(initialValue: DisplayStore())
+    }
+
+    private static func activateExistingInstanceIfNeeded() {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return }
+        let currentPID = NSRunningApplication.current.processIdentifier
+        let firstInstance = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier)
+            .min { left, right in
+                let leftLaunch = left.launchDate ?? .distantFuture
+                let rightLaunch = right.launchDate ?? .distantFuture
+                return leftLaunch == rightLaunch
+                    ? left.processIdentifier < right.processIdentifier
+                    : leftLaunch < rightLaunch
+            }
+        guard let firstInstance, firstInstance.processIdentifier != currentPID else { return }
+        firstInstance.activate(options: [])
+        Foundation.exit(0)
     }
 
     var body: some Scene {

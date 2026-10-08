@@ -1,17 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#193D6E"/><stop offset="1" stop-color="#101C30"/></linearGradient>
-    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#F2F5FA"/><stop offset="1" stop-color="#9EACBE"/></linearGradient>
-    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#1B518F"/><stop offset="1" stop-color="#0A1D36"/></linearGradient>
-  </defs>
-  <rect x="24" y="24" width="976" height="976" rx="196" fill="url(#background)"/>
-  <rect x="151" y="232" width="722" height="471" rx="38" fill="#000" opacity=".2"/>
-  <rect x="473" y="688" width="78" height="111" rx="8" fill="url(#metal)"/>
-  <rect x="345" y="797" width="334" height="30" rx="15" fill="url(#metal)"/>
-  <rect x="151" y="220" width="722" height="471" rx="38" fill="url(#metal)"/>
-  <rect x="180" y="249" width="664" height="415" rx="18" fill="url(#screen)"/>
-  <rect x="390" y="335" width="112" height="112" rx="15" fill="#E7F5FF"/>
-  <rect x="522" y="335" width="112" height="112" rx="15" fill="#82D2FF"/>
-  <rect x="390" y="467" width="112" height="112" rx="15" fill="#469FFF"/>
-  <rect x="522" y="467" width="112" height="112" rx="15" fill="#2572E4"/>
+  <rect x="32" y="32" width="960" height="960" rx="208" fill="#121B29"/>
+  <path d="M320 322H208V434M704 322H816V434M208 590V702H320M704 702H816V590" fill="none" stroke="#56B4FF" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="408" y="408" width="88" height="88" rx="12" fill="#F7FAFF"/>
+  <rect x="528" y="408" width="88" height="88" rx="12" fill="#56B4FF"/>
+  <rect x="408" y="528" width="88" height="88" rx="12" fill="#56B4FF"/>
+  <rect x="528" y="528" width="88" height="88" rx="12" fill="#F7FAFF"/>
 </svg>

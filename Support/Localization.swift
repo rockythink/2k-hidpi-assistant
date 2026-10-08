@@ -34,7 +34,7 @@ enum L10n {
     }
 
     private static let zh: [String: String] = [
-        "app.name": "2K HiDPI 助手",
+        "app.name": "PixelFit",
         "menu.displays": "显示器",
         "menu.refresh": "刷新显示器",
         "menu.openMain": "打开主窗口",
@@ -161,7 +161,7 @@ enum L10n {
     ]
 
     private static let en: [String: String] = [
-        "app.name": "2K HiDPI Assistant",
+        "app.name": "PixelFit",
         "menu.displays": "Displays",
         "menu.refresh": "Refresh Displays",
         "menu.openMain": "Open Main Window",
