@@ -14,9 +14,11 @@ struct HiDPIBuddyApp: App {
     var body: some Scene {
         WindowGroup(L10n.t("app.name", store.language), id: "main") {
             ContentView(store: store)
-                .frame(minWidth: 980, minHeight: 640)
+                .frame(minWidth: 840, minHeight: 640)
                 .background(MainWindowTagger())
         }
+        .defaultSize(width: 980, height: 720)
+        .windowToolbarStyle(.unifiedCompact)
         .commands {
             CommandMenu(L10n.t("menu.displays", store.language)) {
                 Button(L10n.t("menu.refresh", store.language)) {
@@ -36,6 +38,7 @@ struct HiDPIBuddyApp: App {
             MenuBarControlView(store: store)
         }
         .menuBarExtraStyle(.window)
+        .windowResizability(.contentSize)
     }
 }
 

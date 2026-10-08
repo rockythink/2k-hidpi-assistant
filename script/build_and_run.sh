@@ -17,7 +17,9 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON_SOURCE="$ROOT_DIR/Resources/AppIcon.icns"
 
 cd "$ROOT_DIR"
-pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+if [[ "$MODE" != "--build" && "$MODE" != "build" ]]; then
+  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+fi
 
 swift build
 BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
@@ -25,7 +27,8 @@ BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
-chmod +x "$APP_BINARY"
+cp "$(dirname "$BUILD_BINARY")/HiDPIBuddyVirtualDisplayHelper" "$APP_MACOS/HiDPIBuddyVirtualDisplayHelper"
+chmod +x "$APP_BINARY" "$APP_MACOS/HiDPIBuddyVirtualDisplayHelper"
 cp "$APP_ICON_SOURCE" "$APP_RESOURCES/AppIcon.icns"
 
 cat >"$INFO_PLIST" <<PLIST
@@ -57,8 +60,6 @@ cat >"$INFO_PLIST" <<PLIST
   <string>$MIN_SYSTEM_VERSION</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.utilities</string>
-  <key>NSAppleEventsUsageDescription</key>
-  <string>2K HiDPI Assistant uses Apple Events to toggle system Dark Mode and media settings.</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>NSSupportsAutomaticTermination</key>
@@ -81,6 +82,9 @@ open_app() {
 }
 
 case "$MODE" in
+  --build|build)
+    printf "%s\n" "$APP_BUNDLE"
+    ;;
   run)
     open_app
     ;;
@@ -101,7 +105,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--build|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

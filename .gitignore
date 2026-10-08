@@ -4,3 +4,15 @@ dist/*
 .DS_Store
 *.xcuserdata/
 DerivedData/
+
+# Local assistant/editor state and credentials
+.codex/
+.pi/
+.env
+.env.*
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile

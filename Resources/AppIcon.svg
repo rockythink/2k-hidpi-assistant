@@ -1,4 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="HiDPIBuddy app icon">
-  <rect width="1024" height="1024" rx="224" fill="#F7FBFC"/>
-  <path fill="#087A8C" fill-rule="evenodd" d="M224 260c-31 0-56 25-56 56v332c0 31 25 56 56 56h218v76H330c-20 0-36 16-36 36s16 36 36 36h364c20 0 36-16 36-36s-16-36-36-36H582v-76h218c31 0 56-25 56-56V316c0-31-25-56-56-56H224Zm30 86v272h516V346H254Zm180 106c0-18 14-32 32-32h92c18 0 32 14 32 32v92c0 18-14 32-32 32h-92c-18 0-32-14-32-32v-92Zm188 14c0-25 20-46 46-46s46 21 46 46-20 46-46 46-46-21-46-46Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#193D6E"/><stop offset="1" stop-color="#101C30"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#F2F5FA"/><stop offset="1" stop-color="#9EACBE"/></linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#1B518F"/><stop offset="1" stop-color="#0A1D36"/></linearGradient>
+  </defs>
+  <rect x="24" y="24" width="976" height="976" rx="196" fill="url(#background)"/>
+  <rect x="151" y="232" width="722" height="471" rx="38" fill="#000" opacity=".2"/>
+  <rect x="473" y="688" width="78" height="111" rx="8" fill="url(#metal)"/>
+  <rect x="345" y="797" width="334" height="30" rx="15" fill="url(#metal)"/>
+  <rect x="151" y="220" width="722" height="471" rx="38" fill="url(#metal)"/>
+  <rect x="180" y="249" width="664" height="415" rx="18" fill="url(#screen)"/>
+  <rect x="390" y="335" width="112" height="112" rx="15" fill="#E7F5FF"/>
+  <rect x="522" y="335" width="112" height="112" rx="15" fill="#82D2FF"/>
+  <rect x="390" y="467" width="112" height="112" rx="15" fill="#469FFF"/>
+  <rect x="522" y="467" width="112" height="112" rx="15" fill="#2572E4"/>
 </svg>

@@ -4,529 +4,117 @@ import SwiftUI
 struct MenuBarControlView: View {
     @Bindable var store: DisplayStore
     @Environment(\.openWindow) private var openWindow
-    @State private var presetName = "main"
+    @State private var contentHeight: CGFloat = 300
+    @State private var physicalConfigurationRequestID: UUID?
 
     var body: some View {
-        ZStack {
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                .ignoresSafeArea()
-            LinearGradient(
-                colors: [
-                    AppTheme.glassOverlayStart,
-                    AppTheme.glassOverlayEnd
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    header
-                    presetsPanel
-                    globalPanel
-
-                    ForEach(store.displays) { display in
-                        displayPanel(display)
-                    }
-
-                    footer
-                }
-                .padding(14)
-            }
-        }
-        .frame(width: 420, height: 620)
-        .tint(AppTheme.accent)
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.t("app.name", store.language))
-                    .font(.title3.weight(.semibold))
-                Text(store.statusMessage)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .lineLimit(1)
-            }
-            Spacer()
-            Button {
-                AppWindowController.showMainWindow {
-                    openWindow(id: "main")
-                }
-            } label: {
-                Label(L10n.t("settings.title", store.language), systemImage: "gearshape")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 14, weight: .semibold))
-                    .padding(6)
-                    .background(AppTheme.controlFill, in: Circle())
-            }
-            .buttonStyle(.plain)
-        }
-        .foregroundStyle(AppTheme.primaryText)
-        .padding(.horizontal, 2)
-        .padding(.top, 2)
-    }
-
-    private var presetsPanel: some View {
-        controlPanel(
-            title: L10n.t("preset.title", store.language),
-            subtitle: "保存并快速恢复分辨率、亮度、音量和夜览等组合。"
-        ) {
-
-            HStack(spacing: 8) {
-                if store.presets.isEmpty {
-                    Button(presetName) {
-                        store.savePreset(named: presetName)
-                    }
-                    .buttonStyle(.borderedProminent)
-                } else {
-                    ForEach(store.presets) { preset in
-                        Button(preset.name) {
-                            store.applyPreset(preset)
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-
-                Button {
-                    store.savePreset(named: presetName)
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help(L10n.t("preset.saveCurrent", store.language))
-            }
-        }
-    }
-
-    private var globalPanel: some View {
-        controlPanel(
-            title: L10n.t("display.all", store.language),
-            subtitle: "影响所有屏幕的系统级状态。"
-        ) {
-
-            HStack(spacing: 8) {
-                Button {
-                    store.toggleDarkMode()
-                } label: {
-                    Label(
-                        store.isDarkModeEnabled ? L10n.t("darkMode.on", store.language) : L10n.t("darkMode.off", store.language),
-                        systemImage: store.isDarkModeEnabled ? "moon.fill" : "moon"
-                    )
-                    .labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(StatusPillButtonStyle(isOn: store.isDarkModeEnabled, onColor: .blue))
-
-                Button {
-                    store.toggleNightShift()
-                } label: {
-                    Label(
-                        store.isNightShiftEnabled ? L10n.t("nightShift.on", store.language) : L10n.t("nightShift.off", store.language),
-                        systemImage: store.isNightShiftEnabled ? "moon.stars.fill" : "moon.stars"
-                    )
-                    .labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(StatusPillButtonStyle(isOn: store.isNightShiftEnabled, onColor: AppTheme.accent))
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    store.toggleSync()
-                } label: {
-                    Label(
-                        store.syncSettings.isEnabled ? L10n.t("sync.on", store.language) : L10n.t("sync.off", store.language),
-                        systemImage: "link"
-                    )
-                }
-                .buttonStyle(StatusPillButtonStyle(isOn: store.syncSettings.isEnabled, onColor: .green))
-
-                Menu {
-                    Button {
-                        store.setFollowDisplay(nil)
-                    } label: {
-                        HStack {
-                            if store.syncSettings.leaderDisplayID == nil {
-                                Image(systemName: "checkmark")
-                            }
-                            Text(L10n.t("sync.followOff", store.language))
-                        }
-                    }
-
-                    Divider()
-
-                    ForEach(store.displays) { display in
-                        Button {
-                            store.setFollowDisplay(display.id)
-                        } label: {
-                            HStack {
-                                if store.syncSettings.leaderDisplayID == display.id {
-                                    Image(systemName: "checkmark")
-                                }
-                                Text(display.shortName(language: store.language))
-                            }
-                        }
-                    }
-                } label: {
-                    Label(L10n.t("sync.follow", store.language), systemImage: "point.3.connected.trianglepath.dotted")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-            Text("联动开启后，亮度/音量会按当前策略同步到多台显示器。跟随显示器用于指定主控屏。")
-                .font(.caption)
-                .foregroundStyle(AppTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func displayPanel(_ display: DisplayDevice) -> some View {
-        let state = store.controlState(for: display.id)
-
-        return controlPanel(
-            title: display.shortName(language: store.language),
-            subtitle: displayControlSubtitle(for: display),
-            systemImage: display.isBuiltin ? "macbook" : "display"
-        ) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(display.currentMode?.resolutionWithAspectLabel ?? "-")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.secondaryText)
-                Spacer()
-                Text(display.currentMode?.detailLabel ?? "")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .lineLimit(1)
-            }
-
-            controlSlider(
-                icon: "sun.max",
-                title: "亮度",
-                description: "拖动时只发送最新值，避免硬件 DDC 读回拖慢手感。",
-                valueText: percentText(store.controlState(for: display.id).brightness),
-                value: Binding(
-                    get: { store.controlState(for: display.id).brightness },
-                    set: { store.updateBrightness($0, for: display.id) }
-                ),
-                range: 0.05...1.2
-            )
-
-            controlSlider(
-                icon: "circle.lefthalf.filled",
-                title: "对比度",
-                description: "影响显示器硬件对比度，过高可能丢失暗部或亮部细节。",
-                valueText: percentText(store.controlState(for: display.id).contrast / 1.8),
-                value: Binding(
-                    get: { store.controlState(for: display.id).contrast },
-                    set: { store.updateContrast($0, for: display.id) }
-                ),
-                range: 0.4...1.8
-            )
-
-            controlSlider(
-                icon: "speaker.wave.2",
-                title: "音量",
-                description: "仅对支持 DDC 音量的显示器有效；失败时不会保存为成功状态。",
-                valueText: percentText(store.controlState(for: display.id).volume),
-                value: Binding(
-                    get: { store.controlState(for: display.id).volume },
-                    set: { store.updateVolume($0, for: display.id) }
-                ),
-                range: 0...1
-            )
-
-            HStack(spacing: 8) {
-                controlModeMenu(display, state: state)
-                    .frame(maxWidth: .infinity)
-
-                inputSourceMenu(display, state: state)
-                    .frame(maxWidth: .infinity)
-            }
-            Text("自动模式会优先 Apple 原生亮度、Apple Silicon DDC、Framebuffer DDC，最后回退软件控制。输入源当前只记录，不默认发送真实切换。")
-                .font(.caption)
-                .foregroundStyle(AppTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 8) {
-                resolutionDisclosure(display)
-                    .frame(maxWidth: .infinity)
-
-                Button {
-                    store.toggleDisplayPower(for: display.id)
-                } label: {
-                    Label(
-                        state.isPoweredOff ? L10n.t("power.on", store.language) : L10n.t("power.off", store.language),
-                        systemImage: "power"
-                    )
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .frame(maxWidth: .infinity)
-
-                Menu {
-                    Button {
-                        store.openSystemDisplaySettings()
-                    } label: {
-                        Label(L10n.t("hidpi.openSettings", store.language), systemImage: "gearshape")
-                    }
-
-                    Button {
-                        store.sleepDisplays()
-                    } label: {
-                        Label(L10n.t("display.sleep", store.language), systemImage: "display.trianglebadge.exclamationmark")
-                    }
-                } label: {
-                    Label(L10n.t("menu.more", store.language), systemImage: "ellipsis.circle")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .frame(maxWidth: .infinity)
-            }
-            Text("分辨率只切换 macOS 当前暴露的真实模式；电源类硬件写入会保守回退。")
-                .font(.caption)
-                .foregroundStyle(AppTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func controlModeMenu(_ display: DisplayDevice, state: DisplayControlState) -> some View {
-        Menu {
-            ForEach(DisplayControlMode.allCases) { mode in
-                Button {
-                    store.setControlMode(mode, for: display.id)
-                } label: {
-                    HStack {
-                        if state.controlMode == mode {
-                            Image(systemName: "checkmark")
-                        }
-                        Text(mode.label(language: store.language))
-                    }
-                }
-            }
-
-            Divider()
-
-            Button {
-                store.explainControlModes()
-            } label: {
-                Text(L10n.t("controlMode.whatIsThis", store.language))
-            }
-
-            Divider()
-
-            Button {
-                store.explainM1HDMILimitation()
-            } label: {
-                Text(L10n.t("controlMode.m1HDMI", store.language))
-            }
-        } label: {
-            Label(
-                store.protocolStatus(for: display.id),
-                systemImage: "slider.horizontal.3"
-            )
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-    }
-
-    private func inputSourceMenu(_ display: DisplayDevice, state: DisplayControlState) -> some View {
-        Menu {
-            ForEach(store.inputSourceOptions(for: display).filter { !$0.contains("Specific") }, id: \.self) { input in
-                Button {
-                    store.selectInputSourcePreview(input, for: display.id)
-                } label: {
-                    HStack {
-                        if state.inputSource == input {
-                            Image(systemName: "checkmark")
-                        }
-                        Text(input)
-                    }
-                }
-            }
-
-            Divider()
-
-            Label(L10n.t("inputSource.experimentalWarning", store.language), systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.yellow)
-        } label: {
-            Label(L10n.t("inputSource.title", store.language), systemImage: "cable.connector")
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-    }
-
-    private func resolutionDisclosure(_ display: DisplayDevice) -> some View {
-        let switchableModes = display.menuSwitchModes
-
-        return Menu {
-            let hiDPIModes = switchableModes.filter(\.isHiDPI)
-            let standardModes = switchableModes.filter { !$0.isHiDPI }
-
-            if !hiDPIModes.isEmpty {
-                Section("HiDPI") {
-                    ForEach(hiDPIModes) { mode in
-                        quickModeButton(mode, display: display)
-                    }
-                }
-            }
-
-            if !standardModes.isEmpty {
-                Section(L10n.t("hidpi.standard", store.language)) {
-                    ForEach(standardModes) { mode in
-                        quickModeButton(mode, display: display)
-                    }
-                }
-            }
-        } label: {
-            Label(L10n.t("systemSettings.resolutions", store.language), systemImage: "rectangle.inset.filled")
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-    }
-
-    private func quickModeButton(_ mode: DisplayMode, display: DisplayDevice) -> some View {
-        let isCurrent = display.currentMode?.matchesEffectiveMode(mode) == true
-        return Button {
-            store.applyDisplayMode(mode, for: display.id)
-        } label: {
+        VStack(spacing: 0) {
             HStack {
-                Text(mode.menuLabel)
-                if isCurrent {
-                    Image(systemName: "checkmark")
-                }
-            }
-        }
-        .disabled(isCurrent)
-    }
-
-    private func displayControlSubtitle(for display: DisplayDevice) -> String {
-        let protocolText = store.protocolStatus(for: display.id)
-        if display.isBuiltin {
-            return "内建屏优先使用 Apple 原生亮度能力；分辨率仍只切换系统暴露的真实模式。"
-        }
-        return "硬件控制：\(protocolText)。读写失败时会回退软件控制。"
-    }
-
-    private func percentText(_ value: Double) -> String {
-        "\(Int((value * 100).rounded()))%"
-    }
-
-    private func controlSlider(
-        icon: String,
-        title: String,
-        description: String,
-        valueText: String,
-        value: Binding<Double>,
-        range: ClosedRange<Double>
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .frame(width: 18)
-                    .foregroundStyle(AppTheme.primaryText)
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(AppTheme.primaryText)
+                Text(L10n.t("app.name", store.language)).font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Text(valueText)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(AppTheme.secondaryText)
-            }
-            Slider(value: value, in: range)
-                .controlSize(.small)
-            Text(description)
-                .font(.caption2)
-                .foregroundStyle(AppTheme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, 3)
-    }
-
-    private func controlPanel<Content: View>(
-        title: String,
-        subtitle: String,
-        systemImage: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let systemImage {
-                    Label(title, systemImage: systemImage)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.primaryText)
-                        .lineLimit(1)
-                } else {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppTheme.primaryText)
+                Button { store.refreshDisplays() } label: {
+                    Label(L10n.t("action.refresh", store.language), systemImage: "arrow.clockwise").labelStyle(.iconOnly)
                 }
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                .buttonStyle(.borderless)
+                .help(L10n.t("action.refresh", store.language))
+                .disabled(store.isChangingPhysicalConfiguration)
             }
-            content()
+            .padding(12)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    if store.displays.count > 1 {
+                        DisplayArrangementView(displays: store.displays, selectedDisplayID: $store.selectedDisplayID, language: store.language)
+                    }
+                    if store.isPreparingVirtualHiDPI || store.pendingModeChange != nil || store.virtualSession != nil {
+                        ResolutionChangeControls(store: store)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .appCard()
+                    }
+                    if store.displays.isEmpty {
+                        Text(L10n.t("empty.noDisplay", store.language)).foregroundStyle(.secondary)
+                    }
+                    ForEach(store.displays.indices, id: \.self) { index in
+                        displayPanel(store.displays[index], number: index + 1)
+                    }
+
+                    if let error = store.lastError {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(12)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(height: min(contentHeight, maximumContentHeight))
+            Divider()
+            HStack(spacing: 10) {
+                Button(L10n.t("menu.openMain", store.language)) {
+                    AppWindowController.showMainWindow { openWindow(id: "main") }
+                }
+                Button { store.openSystemDisplaySettings() } label: { Image(systemName: "gearshape") }
+                    .help(L10n.t("hidpi.openSettings", store.language))
+                    .accessibilityLabel(L10n.t("hidpi.openSettings", store.language))
+                Text(store.statusMessage).font(.caption).foregroundStyle(.secondary).lineLimit(1).help(store.statusMessage)
+                Spacer(minLength: 0)
+                Button(L10n.t("menu.quit", store.language)) { NSApplication.shared.terminate(nil) }
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
         }
-        .padding(14)
-        .appCard(cornerRadius: 8)
+        .frame(width: 360)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(AppTheme.background)
+        .tint(AppTheme.accent)
+        .physicalHiDPIConfirmation(store: store, requestID: $physicalConfigurationRequestID)
     }
 
-    private var footer: some View {
+    private var maximumContentHeight: CGFloat {
+        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        return min(500, max(120, (screen?.visibleFrame.height ?? 640) - 110))
+    }
+
+    private func displayPanel(_ display: DisplayDevice, number: Int) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let pending = store.pendingModeChange {
-                Text("\(L10n.t("hidpi.pending", store.language)) · \(pending.remainingSeconds)s")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                HStack {
-                    Button(L10n.t("hidpi.confirm", store.language)) {
-                        store.confirmDisplayModeChange()
+            HStack(spacing: 9) {
+                DisplayGlyph(display: display, number: number)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(display.shortName(language: store.language))
+                            .font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                            .help(display.shortName(language: store.language))
+                        if display.metadata.isMain {
+                            Text(L10n.t("display.main", store.language)).font(.system(size: 10)).foregroundStyle(.secondary)
+                        }
                     }
-                    Button(L10n.t("hidpi.rollback", store.language)) {
-                        store.rollbackDisplayModeChange()
+                    if let mode = display.currentMode {
+                        Text("\(String(mode.width))×\(String(mode.height)) · \(mode.refreshRateLabel)")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
+                Spacer(minLength: 0)
             }
-
-            Text(store.statusMessage)
-                .font(.caption)
-                .foregroundStyle(AppTheme.secondaryText)
-                .lineLimit(1)
-
-            if let lastError = store.lastError {
-                Text(lastError)
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .lineLimit(2)
+            HStack(spacing: 10) {
+                Text("HiDPI").font(.caption).foregroundStyle(.secondary)
+                HiDPIResolutionMenu(store: store, display: display)
+                    .controlSize(.small)
             }
+            PhysicalHiDPIControls(store: store, display: display) {
+                physicalConfigurationRequestID = store.physicalConfigurationRequest?.id
+            }
+            DisclosureGroup(L10n.t("ui.advanced", store.language)) {
+                ExperimentalHiDPIControls(store: store, display: display)
+                    .padding(.top, 8)
+            }
+            .font(.caption)
         }
-        .padding(.horizontal, 2)
-    }
-}
-
-private struct StatusPillButtonStyle: ButtonStyle {
-    var isOn: Bool
-    var onColor: Color
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(isOn ? Color.white : AppTheme.primaryText)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 7)
-            .background(background(configuration: configuration), in: Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(isOn ? Color.clear : AppTheme.border, lineWidth: 1)
-            )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-
-    private func background(configuration: Configuration) -> Color {
-        if isOn {
-            return onColor.opacity(configuration.isPressed ? 0.72 : 0.92)
-        }
-        return AppTheme.controlFill.opacity(configuration.isPressed ? 1.35 : 1)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard()
     }
 }

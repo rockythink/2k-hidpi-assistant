@@ -8,7 +8,8 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "HiDPIBuddy", targets: ["HiDPIBuddy"])
+        .executable(name: "HiDPIBuddy", targets: ["HiDPIBuddy"]),
+        .executable(name: "HiDPIBuddyVirtualDisplayHelper", targets: ["HiDPIBuddyVirtualDisplayHelper"])
     ],
     targets: [
         .executableTarget(
@@ -17,11 +18,13 @@ let package = Package(
             exclude: [
                 "Tests",
                 "README.md",
+                "LICENSE",
+                "THIRD_PARTY_NOTICES.md",
                 "docs",
                 "dist",
                 "script",
                 "Resources",
-                ".codex",
+                "NativeVirtualDisplay",
                 ".build"
             ],
             sources: [
@@ -35,6 +38,12 @@ let package = Package(
             swiftSettings: [
                 .enableUpcomingFeature("BareSlashRegexLiterals")
             ]
+        ),
+        .executableTarget(
+            name: "HiDPIBuddyVirtualDisplayHelper",
+            path: "NativeVirtualDisplay",
+            cSettings: [.unsafeFlags(["-fobjc-arc"])],
+            linkerSettings: [.linkedFramework("Foundation"), .linkedFramework("CoreGraphics")]
         ),
         .testTarget(
             name: "HiDPIBuddyTests",

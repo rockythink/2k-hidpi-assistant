@@ -21,7 +21,16 @@ enum AppWindowController {
     }
 
     static func tagMainWindow(_ window: NSWindow?) {
-        window?.identifier = mainWindowIdentifier
+        guard let window else { return }
+        window.identifier = mainWindowIdentifier
+        configureMainWindow(window)
+    }
+
+    private static func configureMainWindow(_ window: NSWindow) {
+        window.isOpaque = true
+        window.backgroundColor = .windowBackgroundColor
+        window.titlebarAppearsTransparent = false
+        window.isMovableByWindowBackground = false
     }
 
     private static var mainWindows: [NSWindow] {

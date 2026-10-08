@@ -24,6 +24,11 @@ struct DisplayDevice: Identifiable, Codable, Hashable {
     }
 
     var nativeMode: DisplayMode? {
+        if let panel = metadata.panelResolution {
+            return availableModes.lazy.filter {
+                !$0.isHiDPI && $0.pixelWidth == panel.width && $0.pixelHeight == panel.height
+            }.max { $0.refreshRate < $1.refreshRate }
+        }
         let standardModes = availableModes.filter { !$0.isHiDPI }
         return standardModes.max { lhs, rhs in
             if lhs.pixelArea != rhs.pixelArea { return lhs.pixelArea < rhs.pixelArea }
@@ -87,35 +92,109 @@ struct DisplayDevice: Identifiable, Codable, Hashable {
     }
 
     var recommendedHiDPIModes: [DisplayMode] {
-        let hidpiModes = availableModes.filter(\.isHiDPI)
-        guard !hidpiModes.isEmpty else { return [] }
-
-        return hidpiModes
-            .sorted { lhs, rhs in
-                let lhsRank = displayClass.preferenceRank(for: lhs)
-                let rhsRank = displayClass.preferenceRank(for: rhs)
-                if lhsRank != rhsRank { return lhsRank < rhsRank }
-                if lhs.refreshRate != rhs.refreshRate { return lhs.refreshRate > rhs.refreshRate }
-                return lhs.pixelArea > rhs.pixelArea
-            }
-            .reduce(into: [DisplayMode]()) { result, mode in
-                guard !result.contains(where: { $0.width == mode.width && $0.height == mode.height }) else { return }
-                result.append(mode)
-            }
-            .prefix(5)
-            .map { $0 }
+        guard let nativeMode else { return [] }
+        let targets = preferredHiDPITargets
+        func rank(_ mode: DisplayMode) -> Int {
+            targets.firstIndex { $0.width == mode.width && $0.height == mode.height }
+                ?? targets.count + abs(mode.width - 1600) / 100
+        }
+        return availableModes.filter {
+            $0.isHiDPI && $0.width * nativeMode.pixelHeight == $0.height * nativeMode.pixelWidth
+        }.sorted { lhs, rhs in
+            let lhsRank = rank(lhs)
+            let rhsRank = rank(rhs)
+            if lhsRank != rhsRank { return lhsRank < rhsRank }
+            if lhs.refreshRate != rhs.refreshRate { return lhs.refreshRate > rhs.refreshRate }
+            return lhs.pixelArea > rhs.pixelArea
+        }.reduce(into: [DisplayMode]()) { result, mode in
+            guard !result.contains(where: { $0.width == mode.width && $0.height == mode.height }) else { return }
+            result.append(mode)
+        }.prefix(5).map { $0 }
     }
 
     var unavailableRecommendedHiDPITargets: [DisplayResolutionTarget] {
-        displayClass.preferredHiDPIResolutions
-            .filter { target in
-                !availableModes.contains { mode in
-                    mode.isHiDPI && mode.width == target.width && mode.height == target.height
-                }
-            }
-            .prefix(4)
-            .map { DisplayResolutionTarget(width: $0.width, height: $0.height) }
+        preferredHiDPITargets.filter { target in
+            !availableModes.contains { $0.isHiDPI && $0.width == target.width && $0.height == target.height }
+        }.prefix(4).map { $0 }
     }
+
+    var virtualHiDPITargets: [DisplayResolutionTarget] {
+        guard isOnline, !isBuiltin, rotation.truncatingRemainder(dividingBy: 360) == 0,
+              let nativeMode, nativeMode.pixelWidth > 0, nativeMode.pixelHeight > 0,
+              nativeMode.pixelWidth * 5 == nativeMode.pixelHeight * 8 else { return [] }
+        return [
+            DisplayResolutionTarget(width: 1440, height: 900),
+            DisplayResolutionTarget(width: 1600, height: 1000),
+            DisplayResolutionTarget(width: 1680, height: 1050),
+            DisplayResolutionTarget(width: 1920, height: 1200)
+        ].filter { target in
+            target.width > nativeMode.pixelWidth / 2 &&
+            target.width <= nativeMode.pixelWidth && target.height <= nativeMode.pixelHeight &&
+            !availableModes.contains { $0.isHiDPI && $0.width == target.width && $0.height == target.height }
+        }
+    }
+
+    var hiDPIResolutionChoices: HiDPIResolutionChoices {
+        guard let native = nativeMode else { return HiDPIResolutionChoices(all: [], recommended: [], nativeMode: nil, systemModes: []) }
+        let modes = systemScaledModes
+        let systemTargets = modes.compactMap { mode -> DisplayResolutionTarget? in
+            guard mode.isHiDPI, mode.width * native.pixelHeight == mode.height * native.pixelWidth else { return nil }
+            return DisplayResolutionTarget(width: mode.width, height: mode.height)
+        }
+        let available = Set(systemTargets)
+        let all = available.sorted { $0.width == $1.width ? $0.height > $1.height : $0.width > $1.width }
+        var recommended = preferredHiDPITargets.filter { available.contains($0) }
+        if let current = currentMode, current.isHiDPI {
+            let target = DisplayResolutionTarget(width: current.width, height: current.height)
+            if available.contains(target), !recommended.contains(target) { recommended.insert(target, at: 0) }
+        }
+        return HiDPIResolutionChoices(all: all, recommended: recommended, nativeMode: native, systemModes: modes)
+    }
+
+    private var preferredHiDPITargets: [DisplayResolutionTarget] {
+        guard let nativeMode else { return [] }
+        let isPortrait = nativeMode.pixelWidth < nativeMode.pixelHeight
+        let width = max(nativeMode.pixelWidth, nativeMode.pixelHeight)
+        let height = min(nativeMode.pixelWidth, nativeMode.pixelHeight)
+        let sizes: [(Int, Int)]
+        if width * 9 == height * 16 {
+            switch displayClass {
+            case .twoK:
+                sizes = [(1280, 720), (1600, 900), (1920, 1080), (1680, 945), (1440, 810)]
+            case .fourKOrAbove:
+                sizes = [(2560, 1440), (2304, 1296), (2048, 1152), (1920, 1080)]
+            case .twoPointFiveK, .lowResolution, .unknown:
+                sizes = [(1920, 1080), (1600, 900), (1280, 720)]
+            }
+        } else if width * 5 == height * 8 {
+            if displayClass == .fourKOrAbove {
+                sizes = [(2560, 1600), (2304, 1440), (2048, 1280), (1920, 1200)]
+            } else {
+                sizes = [(1920, 1200), (1680, 1050), (1600, 1000), (1440, 900), (1280, 800)]
+            }
+        } else if width.isMultiple(of: 2), height.isMultiple(of: 2) {
+            sizes = [(width / 2, height / 2)]
+        } else {
+            sizes = []
+        }
+        return sizes.filter { $0.0 <= width && $0.1 <= height }.map { size in
+            DisplayResolutionTarget(width: isPortrait ? size.1 : size.0, height: isPortrait ? size.0 : size.1)
+        }
+    }
+
+    var physicalHiDPIProbeTarget: DisplayResolutionTarget? {
+        guard isOnline, !isBuiltin, vendorID != 0, modelID != 0,
+              rotation.truncatingRemainder(dividingBy: 360) == 0,
+              let native = nativeMode, native.pixelWidth == 2560, native.pixelHeight == 1600 else { return nil }
+        return DisplayResolutionTarget(width: 1600, height: 1000)
+    }
+}
+
+struct HiDPIResolutionChoices {
+    let all: [DisplayResolutionTarget]
+    let recommended: [DisplayResolutionTarget]
+    let nativeMode: DisplayMode?
+    let systemModes: [DisplayMode]
 }
 
 struct DisplayResolutionTarget: Codable, Hashable, Identifiable {
@@ -132,12 +211,12 @@ struct DisplayResolutionTarget: Codable, Hashable, Identifiable {
     }
 
     var aspectRatioLabel: String {
-        let divisor = DisplayMode.greatestCommonDivisor(width, height)
-        return "\(width / divisor):\(height / divisor)"
+        DisplayMode.aspectRatioLabel(width: width, height: height)
     }
 }
 
 struct DisplayMetadata: Codable, Hashable {
+    var panelResolution: DisplayResolutionTarget? = nil
     var productName: String?
     var vendorID: UInt32
     var productID: UInt32
@@ -239,26 +318,6 @@ enum DisplayClass: Codable, Hashable {
         }
     }
 
-    var preferredHiDPIResolutions: [(width: Int, height: Int)] {
-        switch self {
-        case .twoK:
-            [(1920, 1080), (1680, 945), (1600, 900), (1440, 810), (1280, 720)]
-        case .twoPointFiveK:
-            [(1920, 1200), (1680, 1050), (1600, 1000), (1440, 900), (1280, 800), (1920, 1080), (1600, 900)]
-        case .fourKOrAbove:
-            [(2560, 1440), (2304, 1296), (2048, 1152), (1920, 1080)]
-        case .lowResolution, .unknown:
-            [(1920, 1080), (1680, 1050), (1600, 900), (1440, 900), (1280, 800), (1280, 720)]
-        }
-    }
-
-    func preferenceRank(for mode: DisplayMode) -> Int {
-        let preferredSizes = preferredHiDPIResolutions
-
-        return preferredSizes.firstIndex { width, height in
-            mode.width == width && mode.height == height
-        } ?? preferredSizes.count + abs(mode.width - 1600) / 100
-    }
 }
 
 struct PendingDisplayModeChange: Codable, Hashable {
@@ -268,224 +327,15 @@ struct PendingDisplayModeChange: Codable, Hashable {
     var remainingSeconds: Int
 }
 
-struct DisplayControlState: Codable, Hashable {
-    var brightness: Double = 1
-    var contrast: Double = 1
-    var volume: Double = 0.5
-    var inputSource: String = "USB-C / HDMI"
-    var controlMode: DisplayControlMode = .automatic
-    var isPoweredOff: Bool = false
-    var powerOffKind: DisplayPowerOffKind?
-
-    init(
-        brightness: Double = 1,
-        contrast: Double = 1,
-        volume: Double = 0.5,
-        inputSource: String = "USB-C / HDMI",
-        controlMode: DisplayControlMode = .automatic,
-        isPoweredOff: Bool = false,
-        powerOffKind: DisplayPowerOffKind? = nil
-    ) {
-        self.brightness = brightness
-        self.contrast = contrast
-        self.volume = volume
-        self.inputSource = inputSource
-        self.controlMode = controlMode
-        self.isPoweredOff = isPoweredOff
-        self.powerOffKind = powerOffKind
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        brightness = try container.decodeIfPresent(Double.self, forKey: .brightness) ?? 1
-        contrast = try container.decodeIfPresent(Double.self, forKey: .contrast) ?? 1
-        volume = try container.decodeIfPresent(Double.self, forKey: .volume) ?? 0.5
-        inputSource = try container.decodeIfPresent(String.self, forKey: .inputSource) ?? "USB-C / HDMI"
-        controlMode = try container.decodeIfPresent(DisplayControlMode.self, forKey: .controlMode) ?? .automatic
-        isPoweredOff = try container.decodeIfPresent(Bool.self, forKey: .isPoweredOff) ?? false
-        powerOffKind = try container.decodeIfPresent(DisplayPowerOffKind.self, forKey: .powerOffKind)
-    }
-}
-
-enum DisplayControlMode: String, Codable, Hashable, CaseIterable, Identifiable {
-    case automatic
-    case ddcCI
-    case appleDisplayProtocol
-    case software
-    case samsungSmart
-
-    var id: String { rawValue }
-
-    func label(language: AppLanguage) -> String {
-        switch self {
-        case .automatic:
-            return language.resolvedCode == "zh" ? "自动" : "Auto"
-        case .ddcCI:
-            return "DDC/CI"
-        case .appleDisplayProtocol:
-            return "Apple Display Protocol"
-        case .software:
-            return language.resolvedCode == "zh" ? "软件控制" : "Software Control"
-        case .samsungSmart:
-            return "Samsung/LG Smart"
-        }
-    }
-}
-
-struct AppPreferences: Codable, Hashable {
-    var launchAtLogin: Bool = false
-    var anonymousAnalytics: Bool = false
-    var smoothTransitions: Bool = true
-    var modernIndicators: Bool = true
-    var ultraBright: Bool = false
-    var ultraBrightBuiltInOnly: Bool = false
-    var readDisplayControlValues: Bool = false
-    var showPresetsInMenu: Bool = true
-    var showAllDisplaySettingsInMenu: Bool = true
-    var frontPresetCount: Int = 5
-    var keyboardBrightnessControlsAllDisplays: Bool = true
-    var keyboardVolumeControlsAllDisplays: Bool = true
-    var keyboardVolumeOnlyCurrentAudioOutput: Bool = true
-    var keyboardTargetMode: KeyboardTargetMode = .allDisplays
-    var hudPosition: HUDPosition = .lowerCenter
-    var preferPhysicalDisplayPowerOff: Bool = true
-    var protocolDetectionSchemaVersion: Int = 1
-
-    init(
-        launchAtLogin: Bool = false,
-        anonymousAnalytics: Bool = false,
-        smoothTransitions: Bool = true,
-        modernIndicators: Bool = true,
-        ultraBright: Bool = false,
-        ultraBrightBuiltInOnly: Bool = false,
-        readDisplayControlValues: Bool = false,
-        showPresetsInMenu: Bool = true,
-        showAllDisplaySettingsInMenu: Bool = true,
-        frontPresetCount: Int = 5,
-        keyboardBrightnessControlsAllDisplays: Bool = true,
-        keyboardVolumeControlsAllDisplays: Bool = true,
-        keyboardVolumeOnlyCurrentAudioOutput: Bool = true,
-        keyboardTargetMode: KeyboardTargetMode = .allDisplays,
-        hudPosition: HUDPosition = .lowerCenter,
-        preferPhysicalDisplayPowerOff: Bool = true,
-        protocolDetectionSchemaVersion: Int = 1
-    ) {
-        self.launchAtLogin = launchAtLogin
-        self.anonymousAnalytics = anonymousAnalytics
-        self.smoothTransitions = smoothTransitions
-        self.modernIndicators = modernIndicators
-        self.ultraBright = ultraBright
-        self.ultraBrightBuiltInOnly = ultraBrightBuiltInOnly
-        self.readDisplayControlValues = readDisplayControlValues
-        self.showPresetsInMenu = showPresetsInMenu
-        self.showAllDisplaySettingsInMenu = showAllDisplaySettingsInMenu
-        self.frontPresetCount = frontPresetCount
-        self.keyboardBrightnessControlsAllDisplays = keyboardBrightnessControlsAllDisplays
-        self.keyboardVolumeControlsAllDisplays = keyboardVolumeControlsAllDisplays
-        self.keyboardVolumeOnlyCurrentAudioOutput = keyboardVolumeOnlyCurrentAudioOutput
-        self.keyboardTargetMode = keyboardTargetMode
-        self.hudPosition = hudPosition
-        self.preferPhysicalDisplayPowerOff = preferPhysicalDisplayPowerOff
-        self.protocolDetectionSchemaVersion = protocolDetectionSchemaVersion
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
-        anonymousAnalytics = try container.decodeIfPresent(Bool.self, forKey: .anonymousAnalytics) ?? false
-        smoothTransitions = try container.decodeIfPresent(Bool.self, forKey: .smoothTransitions) ?? true
-        modernIndicators = try container.decodeIfPresent(Bool.self, forKey: .modernIndicators) ?? true
-        ultraBright = try container.decodeIfPresent(Bool.self, forKey: .ultraBright) ?? false
-        ultraBrightBuiltInOnly = try container.decodeIfPresent(Bool.self, forKey: .ultraBrightBuiltInOnly) ?? false
-        readDisplayControlValues = try container.decodeIfPresent(Bool.self, forKey: .readDisplayControlValues) ?? false
-        showPresetsInMenu = try container.decodeIfPresent(Bool.self, forKey: .showPresetsInMenu) ?? true
-        showAllDisplaySettingsInMenu = try container.decodeIfPresent(Bool.self, forKey: .showAllDisplaySettingsInMenu) ?? true
-        frontPresetCount = try container.decodeIfPresent(Int.self, forKey: .frontPresetCount) ?? 5
-        keyboardBrightnessControlsAllDisplays = try container.decodeIfPresent(Bool.self, forKey: .keyboardBrightnessControlsAllDisplays) ?? true
-        keyboardVolumeControlsAllDisplays = try container.decodeIfPresent(Bool.self, forKey: .keyboardVolumeControlsAllDisplays) ?? true
-        keyboardVolumeOnlyCurrentAudioOutput = try container.decodeIfPresent(Bool.self, forKey: .keyboardVolumeOnlyCurrentAudioOutput) ?? true
-        keyboardTargetMode = try container.decodeIfPresent(KeyboardTargetMode.self, forKey: .keyboardTargetMode) ?? .allDisplays
-        hudPosition = try container.decodeIfPresent(HUDPosition.self, forKey: .hudPosition) ?? .lowerCenter
-        preferPhysicalDisplayPowerOff = try container.decodeIfPresent(Bool.self, forKey: .preferPhysicalDisplayPowerOff) ?? true
-        protocolDetectionSchemaVersion = try container.decodeIfPresent(Int.self, forKey: .protocolDetectionSchemaVersion) ?? 0
-    }
-}
-
-enum HUDPosition: String, Codable, Hashable, CaseIterable, Identifiable {
-    case lowerCenter
-    case bottomCenter
-    case topRight
-
-    var id: String { rawValue }
-
-    func label(language: AppLanguage) -> String {
-        switch self {
-        case .lowerCenter:
-            language.resolvedCode == "zh" ? "下方居中" : "Lower Center"
-        case .bottomCenter:
-            language.resolvedCode == "zh" ? "更靠下" : "Bottom Center"
-        case .topRight:
-            language.resolvedCode == "zh" ? "右上角" : "Top Right"
-        }
-    }
-}
-
-enum DisplayPowerOffKind: String, Codable, Hashable {
-    case physical
-    case displaySleep
-    case softBlackout
-}
-
-enum KeyboardTargetMode: String, Codable, Hashable, CaseIterable, Identifiable {
-    case allDisplays
-    case pointerDisplay
-
-    var id: String { rawValue }
-
-    func label(language: AppLanguage) -> String {
-        switch self {
-        case .allDisplays:
-            language.resolvedCode == "zh" ? "所有显示器" : "All Displays"
-        case .pointerDisplay:
-            language.resolvedCode == "zh" ? "鼠标所在显示器" : "Display Under Pointer"
-        }
-    }
-}
-
-struct DisplaySchedule: Codable, Hashable, Identifiable {
-    var id: UUID = UUID()
-    var name: String
-    var presetID: UUID?
-    var timeText: String
-    var isEnabled: Bool = true
-    var lastRunDay: String?
-}
-
 struct DisplayPreset: Codable, Hashable, Identifiable {
-    var id: UUID = UUID()
+    var id: UUID
     var name: String
     var displayModes: [DisplayPresetMode]
-    var controlStates: [String: DisplayControlState] = [:]
-    var syncSettings: DisplaySyncSettings = DisplaySyncSettings()
-    var darkModeEnabled: Bool = false
-    var nightShiftEnabled: Bool = false
 
-    init(
-        id: UUID = UUID(),
-        name: String,
-        displayModes: [DisplayPresetMode],
-        controlStates: [String: DisplayControlState] = [:],
-        syncSettings: DisplaySyncSettings = DisplaySyncSettings(),
-        darkModeEnabled: Bool = false,
-        nightShiftEnabled: Bool = false
-    ) {
+    init(id: UUID = UUID(), name: String, displayModes: [DisplayPresetMode]) {
         self.id = id
         self.name = name
         self.displayModes = displayModes
-        self.controlStates = controlStates
-        self.syncSettings = syncSettings
-        self.darkModeEnabled = darkModeEnabled
-        self.nightShiftEnabled = nightShiftEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -493,10 +343,6 @@ struct DisplayPreset: Codable, Hashable, Identifiable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decode(String.self, forKey: .name)
         displayModes = try container.decodeIfPresent([DisplayPresetMode].self, forKey: .displayModes) ?? []
-        controlStates = try container.decodeIfPresent([String: DisplayControlState].self, forKey: .controlStates) ?? [:]
-        syncSettings = try container.decodeIfPresent(DisplaySyncSettings.self, forKey: .syncSettings) ?? DisplaySyncSettings()
-        darkModeEnabled = try container.decodeIfPresent(Bool.self, forKey: .darkModeEnabled) ?? false
-        nightShiftEnabled = try container.decodeIfPresent(Bool.self, forKey: .nightShiftEnabled) ?? false
     }
 }
 
@@ -505,41 +351,6 @@ struct DisplayPresetMode: Codable, Hashable, Identifiable {
     var displayID: UInt32
     var displayName: String
     var mode: DisplayMode
-}
-
-struct DisplaySyncSettings: Codable, Hashable {
-    var isEnabled: Bool = false
-    var leaderDisplayID: UInt32?
-    var syncBrightness: Bool = true
-    var syncContrast: Bool = true
-    var syncVolume: Bool = false
-
-    init(
-        isEnabled: Bool = false,
-        leaderDisplayID: UInt32? = nil,
-        syncBrightness: Bool = true,
-        syncContrast: Bool = true,
-        syncVolume: Bool = false
-    ) {
-        self.isEnabled = isEnabled
-        self.leaderDisplayID = leaderDisplayID
-        self.syncBrightness = syncBrightness
-        self.syncContrast = syncContrast
-        self.syncVolume = syncVolume
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
-        leaderDisplayID = try container.decodeIfPresent(UInt32.self, forKey: .leaderDisplayID)
-        syncBrightness = try container.decodeIfPresent(Bool.self, forKey: .syncBrightness) ?? true
-        syncContrast = try container.decodeIfPresent(Bool.self, forKey: .syncContrast) ?? true
-        syncVolume = try container.decodeIfPresent(Bool.self, forKey: .syncVolume) ?? false
-    }
-
-    func isLeader(_ displayID: UInt32) -> Bool {
-        leaderDisplayID == nil || leaderDisplayID == displayID
-    }
 }
 
 struct DisplayMode: Codable, Hashable, Identifiable {
@@ -611,7 +422,12 @@ struct DisplayMode: Codable, Hashable, Identifiable {
     }
 
     var aspectRatioLabel: String {
-        let divisor = Self.greatestCommonDivisor(width, height)
+        Self.aspectRatioLabel(width: width, height: height)
+    }
+
+    static func aspectRatioLabel(width: Int, height: Int) -> String {
+        if width > 0, height > 0, width * 5 == height * 8 { return "16:10" }
+        let divisor = greatestCommonDivisor(width, height)
         return "\(width / divisor):\(height / divisor)"
     }
 
@@ -621,6 +437,22 @@ struct DisplayMode: Codable, Hashable, Identifiable {
 
     var menuLabel: String {
         "\(resolutionWithAspectLabel) @ \(refreshRateLabel)"
+    }
+
+    func sharpnessLabel(nativeMode: DisplayMode?, language: AppLanguage) -> String? {
+        guard isHiDPI, let nativeMode else { return nil }
+        let widthScale = Double(pixelWidth) / Double(max(nativeMode.pixelWidth, 1))
+        let heightScale = Double(pixelHeight) / Double(max(nativeMode.pixelHeight, 1))
+        guard abs(widthScale - heightScale) < 0.02 else {
+            return language.resolvedCode == "zh" ? "非等比缩放" : "Uneven scale"
+        }
+        if abs(widthScale - 1) < 0.02 {
+            return language.resolvedCode == "zh" ? "像素匹配" : "Pixel matched"
+        }
+        if abs(widthScale.rounded() - widthScale) < 0.02 {
+            return language.resolvedCode == "zh" ? "整数缩放" : "Integer scale"
+        }
+        return language.resolvedCode == "zh" ? "可能偏软" : "May soften text"
     }
 
     var pixelArea: Int {

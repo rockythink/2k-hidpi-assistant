@@ -11,20 +11,23 @@ struct DisplayDiscoveryService {
         var ids = Array(repeating: CGDirectDisplayID(0), count: Int(count))
         CGGetOnlineDisplayList(count, &ids, &count)
 
-        return ids.map { id in
+        let screenNames = Dictionary(uniqueKeysWithValues: NSScreen.screens.compactMap { screen -> (UInt32, String)? in
+            guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return nil }
+            let name = screen.localizedName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty ? nil : (number.uint32Value, name)
+        })
+        var displays = ids.map { id in
             let isBuiltin = CGDisplayIsBuiltin(id) != 0
             let modes = availableModes(for: id)
             let mode = currentMode(for: id, availableModes: modes) ?? CGDisplayCopyDisplayMode(id).map { makeMode($0, source: .coreGraphicsCurrent) }
             let frame = CGDisplayBounds(id)
             let info = displayInfoDictionary(for: id)
-            let metadata = makeMetadata(for: id, info: info)
+            let productName = screenNames[id] ?? productName(from: info)
+            var metadata = makeMetadata(for: id, info: info)
+            metadata.productName = productName
             return DisplayDevice(
                 id: id,
-                name: displayName(
-                    for: id,
-                    info: info,
-                    fallback: isBuiltin ? L10n.t("display.builtin", language) : L10n.t("display.external", language)
-                ),
+                name: productName ?? (isBuiltin ? L10n.t("display.builtin", language) : L10n.t("display.external", language)),
                 vendorID: CGDisplayVendorNumber(id),
                 modelID: CGDisplayModelNumber(id),
                 serialNumber: CGDisplaySerialNumber(id),
@@ -36,6 +39,16 @@ struct DisplayDiscoveryService {
                 availableModes: modes,
                 rotation: CGDisplayRotation(id)
             )
+        }
+        Self.disambiguateNames(&displays) { display in
+            CGDisplayCreateUUIDFromDisplayID(display.id).map {
+                CFUUIDCreateString(nil, $0.takeRetainedValue()) as String
+            } ?? "unit-\(display.metadata.unitNumber)"
+        }
+        return displays.sorted { lhs, rhs in
+            if lhs.frame.x != rhs.frame.x { return lhs.frame.x < rhs.frame.x }
+            if lhs.frame.y != rhs.frame.y { return lhs.frame.y < rhs.frame.y }
+            return lhs.id < rhs.id
         }
     }
 
@@ -157,11 +170,16 @@ struct DisplayDiscoveryService {
             }
     }
 
-    private func displayName(for id: CGDirectDisplayID, info: [String: Any]?, fallback: String) -> String {
-        guard let name = productName(from: info) else {
-            return fallback
+    static func disambiguateNames(_ displays: inout [DisplayDevice], identity: (DisplayDevice) -> String) {
+        let groups = Dictionary(grouping: displays.indices) { displays[$0].name.lowercased() }
+        for indices in groups.values where indices.count > 1 {
+            let ordered = indices.map { (index: $0, identity: identity(displays[$0])) }.sorted { lhs, rhs in
+                lhs.identity == rhs.identity ? displays[lhs.index].id < displays[rhs.index].id : lhs.identity < rhs.identity
+            }
+            for (offset, entry) in ordered.enumerated() {
+                displays[entry.index].name += " · \(offset + 1)"
+            }
         }
-        return name
     }
 
     private func productName(from info: [String: Any]?) -> String? {
